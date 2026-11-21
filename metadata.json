@@ -1,0 +1,6 @@
+{
+  "name": "VERDORA — Circular Economy & Food Rescue",
+  "description": "A Better Life for Every Resource. AI-assisted circular materials marketplace, surplus food rescue coordination, smart matchmaking, and transparent eco-impact analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

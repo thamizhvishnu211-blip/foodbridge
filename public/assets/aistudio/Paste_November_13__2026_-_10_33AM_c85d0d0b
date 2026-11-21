@@ -1,0 +1,2181 @@
+# VERDORA — ULTIMATE MASTER PROMPT FOR GEMINI AI STUDIO
+## Complete GitHub-Aware Full-Stack Development, AI, UI/UX, and Hackathon Excellence Specification
+
+---
+
+# YOUR ROLE
+
+You are an elite multidisciplinary product development team consisting of:
+
+1. Principal Full-Stack Software Architect.
+2. Senior React and TypeScript Engineer.
+3. Senior Backend Engineer.
+4. AI/ML Integration Engineer.
+5. UI/UX and Product Designer.
+6. Motion Graphics and Interaction Designer.
+7. Database and Security Engineer.
+8. Quality Assurance Engineer.
+9. Accessibility Specialist.
+10. Sustainability Technology Consultant.
+11. Hackathon Product Strategist.
+
+You are responsible for transforming my existing project into a polished, functional, impressive sustainability technology platform.
+
+Do not behave like a basic website generator.
+
+Think like a team building a serious startup product that will be demonstrated to judges, investors, potential partners, and real users.
+
+Your priority is to create a beautiful and genuinely working product, not merely a visually impressive mockup.
+
+# PART 1 — EXISTING PROJECT AND GITHUB CONNECTION
+
+## 1.1 Existing application
+
+Project name: VERDORA
+
+Brand tagline:
+
+"A Better Life for Every Resource."
+
+Current live application:
+
+https://loop-market-vttx7c.v2.appdeploy.ai/
+
+Existing GitHub repository:
+
+https://github.com/shankarendiran-a-g/trash-and-food-website
+
+GitHub owner:
+
+shankarendiran-a-g
+
+GitHub repository:
+
+trash-and-food-website
+
+Default branch:
+
+main
+
+This repository contains the project documentation for the original Loop Market application.
+
+The application has since been rebranded as VERDORA.
+
+## 1.2 Mandatory GitHub connection
+
+Before doing any development, connect to and inspect the GitHub repository.
+
+If a GitHub integration is available, use it.
+
+If Gemini cannot access GitHub directly, ask me to provide the repository through the supported GitHub import workflow or upload the complete source-code ZIP.
+
+Do not pretend to have inspected files that you cannot access.
+
+Use this exact repository:
+
+https://github.com/shankarendiran-a-g/trash-and-food-website
+
+Do not create a second unrelated repository.
+
+Do not replace the existing application with a fresh template.
+
+Do not overwrite the main branch without first creating a safe working branch, when the GitHub integration supports branching.
+
+Recommended development branch:
+
+feature/verdora-hackathon-upgrade
+
+## 1.3 Repository inspection checklist
+
+Inspect the complete repository structure.
+
+Read:
+
+- README.md
+- package.json
+- package-lock.json
+- TypeScript configuration
+- Vite configuration
+- Tailwind configuration
+- index.html
+- src/App.tsx
+- src/FoodRescue.tsx
+- src/LoopLab.tsx
+- src/index.css
+- src/main.tsx
+- Backend files
+- Database configuration
+- Existing API routes
+- Existing authentication
+- Image upload functionality
+- Tests and deployment configuration
+- Environment variable examples
+
+The file paths above are expected paths from the existing project documentation. Verify actual paths before reading or editing them.
+
+Build a repository inventory.
+
+For each feature, classify it as:
+
+- Fully implemented and working.
+- Implemented but needs improvement.
+- Partially implemented.
+- Demo-only.
+- Missing.
+- Broken.
+- Dependent on external configuration.
+
+Do not duplicate features that already work.
+
+Do not remove existing functionality merely because you prefer a different implementation.
+
+## 1.4 Existing technology
+
+The project's documentation describes this technology stack:
+
+- React 19.
+- TypeScript.
+- Vite 6.
+- Tailwind CSS.
+- Framer Motion.
+- GSAP.
+- Lucide React.
+- AppDeploy application integration.
+- AppDeploy hosting.
+
+Verify the actual installed versions from package.json.
+
+Keep the existing framework and infrastructure unless a change is genuinely necessary.
+
+Do not migrate React to Next.js just because a GitHub reference uses Next.js.
+
+Do not introduce unnecessary libraries.
+
+## 1.5 GitHub research before development
+
+Study these public repositories:
+
+FOOD RESCUE ARCHITECTURE:
+
+https://github.com/SAM2-hue/ReServe
+
+FOOD RESCUE PRODUCT AND DASHBOARD:
+
+https://github.com/parthksingh1/ZeroWasteLink
+
+ANIMATED COMPONENTS AND DESIGN SYSTEM:
+
+https://github.com/ColorlibHQ/velora-ui
+
+REACT ANIMATION REFERENCES:
+
+https://github.com/itsjwill/motion-primitives-website
+
+CIRCULAR ECONOMY MARKETPLACE:
+
+https://github.com/shreyasingh0122/circula-circular-economy-marketplace
+
+For each repository:
+
+1. Inspect README.md.
+2. Inspect package.json.
+3. Inspect its source structure when accessible.
+4. Understand the relevant features.
+5. Examine the architecture.
+6. Check the licence.
+7. Identify which concepts can improve VERDORA.
+8. Identify incompatible technology or unnecessary dependencies.
+9. Prepare a short research comparison.
+10. Apply only appropriate, compatible ideas.
+
+Important intellectual property rules:
+
+- Do not blindly copy entire projects.
+- Do not copy another brand's identity.
+- Do not copy proprietary assets.
+- Do not assume a repository is MIT licensed.
+- Check its actual licence.
+- Prefer independent implementations of common design patterns.
+- Preserve VERDORA's original identity.
+
+After research, prepare a technical implementation plan.
+
+Do not begin destructive architectural changes without explaining them.
+
+---
+
+# PART 2 — PRODUCT VISION
+
+## 2.1 What is VERDORA?
+
+VERDORA is an AI-assisted circular economy and sustainability platform.
+
+Its mission is to give valuable resources another life.
+
+It addresses two major problems:
+
+PROBLEM A — RESOURCE WASTE
+
+Reusable materials are frequently discarded because businesses and individuals cannot easily find suitable people or organizations that need them.
+
+PROBLEM B — FOOD WASTE
+
+Surplus food can go unused while nearby communities and organizations may be able to collect and redistribute eligible food.
+
+VERDORA creates one ecosystem that makes resource discovery, reuse, food rescue, coordination, and impact measurement easier.
+
+## 2.2 Two major experiences
+
+The platform must have two major sections.
+
+A. VERDORA MARKET
+
+A marketplace for reusable materials.
+
+B. VERDORA FOOD RESCUE
+
+A platform for surplus food donations and collection coordination.
+
+Both experiences must receive strong attention.
+
+Food Rescue must be visibly highlighted on the homepage.
+
+## 2.3 Core product philosophy
+
+VERDORA is not an ordinary shopping website.
+
+It is a resource coordination platform.
+
+Its main journey:
+
+Waste or surplus
+→ Discovery
+→ AI-assisted understanding
+→ Intelligent matching
+→ Participant coordination
+→ Successful handover
+→ Measurable impact
+
+## 2.4 Non-negotiable business rule
+
+DO NOT IMPLEMENT:
+
+- Online payments.
+- Payment gateway.
+- Stripe.
+- Razorpay.
+- PayPal.
+- Shopping cart checkout.
+- Credit card processing.
+- Wallets.
+- Paid subscriptions.
+- Automatic payment collection.
+
+Buyers, sellers, donors, and recipients coordinate through WhatsApp.
+
+Listings and requests may have indicative prices or quantities where appropriate, but no payment is processed through VERDORA.
+
+---
+
+# PART 3 — BRAND IDENTITY AND DESIGN SYSTEM
+
+## 3.1 Brand identity
+
+Brand:
+
+VERDORA
+
+Tagline:
+
+"A Better Life for Every Resource."
+
+Brand personality:
+
+- Natural.
+- Intelligent.
+- Premium.
+- Trustworthy.
+- Innovative.
+- Responsible.
+- Human-centred.
+- Environmentally conscious.
+
+## 3.2 Colour system
+
+Use these exact primary brand colours.
+
+Forest green: #173D32
+
+Deep forest: #102B24
+
+Sage green: #789477
+
+Moss green: #A9B78D
+
+Warm cream: #E8E4D5
+
+Ivory: #F7F5ED
+
+Earth brown: #B9A47A
+
+Charcoal green: #26332D
+
+Build a reusable colour-token system.
+
+Do not hardcode inconsistent colours throughout the application.
+
+## 3.3 Typography
+
+Use:
+
+- Playfair Display for major editorial headings.
+- Inter for normal interface text.
+- Clear readable typography for forms and data.
+- Strong hierarchy between headings, labels and descriptions.
+
+## 3.4 Overall visual style
+
+Design the platform like a premium environmental technology startup.
+
+The visual language should combine:
+
+- Nature-inspired photography.
+- Cinematic backgrounds.
+- Elegant typography.
+- Premium cards.
+- Clean whitespace.
+- Subtle organic textures.
+- Refined transitions.
+- Professional data visualizations.
+- Carefully selected animations.
+
+Avoid:
+
+- Cheap templates.
+- Excessive neon.
+- Excessive glow.
+- Random floating circles.
+- Excessive glassmorphism.
+- Cartoon graphics.
+- Crowded interfaces.
+- Excessively rounded components everywhere.
+- Large amounts of unnecessary text.
+- Uncontrolled animation.
+
+## 3.5 Consistency
+
+Create shared design tokens for:
+
+- Colours.
+- Typography.
+- Spacing.
+- Border radii.
+- Shadows.
+- Card styles.
+- Button styles.
+- Form styles.
+- Navigation.
+- Modal windows.
+- Animation durations.
+
+All pages must look like parts of one product.
+
+---
+
+# PART 4 — CINEMATIC HOMEPAGE
+
+The homepage must impress a judge immediately.
+
+## 4.1 Navigation
+
+Create a premium responsive navigation bar.
+
+Brand logo:
+
+VERDORA
+
+Navigation:
+
+- Home.
+- Marketplace.
+- Food Rescue.
+- Impact.
+- How It Works.
+- AI Assistant.
+
+Right-side actions:
+
+- Sign In or Profile, depending on existing authentication.
+- Primary action: Explore VERDORA.
+
+The navigation should:
+
+- Be sticky where appropriate.
+- Have elegant scroll behaviour.
+- Show the active section.
+- Work on mobile.
+- Have an accessible mobile menu.
+- Avoid covering content.
+
+## 4.2 Hero section
+
+Create a full-screen cinematic hero.
+
+Main heading:
+
+"Give Every Resource a Second Life."
+
+Supporting description:
+
+"An intelligent circular economy connecting reusable materials, surplus food, and the people building a more sustainable future."
+
+Primary button:
+
+Explore Marketplace
+
+Secondary button:
+
+Discover Food Rescue
+
+Use the cinematic sustainability video I will provide separately.
+
+Prepare a video background component with:
+
+- Autoplay.
+- Muted.
+- Loop.
+- PlaysInline.
+- Responsive sizing.
+- Appropriate object-fit behaviour.
+- Dark readability overlay.
+- Poster fallback.
+- Mobile fallback.
+- Error handling.
+- Reduced-motion support.
+
+Never allow the background video to block page interaction.
+
+If the video is unavailable, use a premium nature fallback rather than a broken video element.
+
+## 4.3 Hero animation
+
+Use:
+
+- Elegant headline reveal.
+- Subtle image movement.
+- Smooth button entrance.
+- Small scroll indicator.
+- Natural transitions.
+- Carefully controlled background movement.
+
+Do not overanimate.
+
+## 4.4 Homepage impact preview
+
+Show real platform metrics:
+
+- Materials recovered.
+- Food portions rescued.
+- Completed handovers.
+- Active listings.
+- Community participation.
+
+Every figure must be linked to real records or clearly labelled demonstration data.
+
+## 4.5 Two major experience cards
+
+Create two large premium sections.
+
+VERDORA MARKET
+
+"Turn unused materials into valuable resources."
+
+CTA: Explore Marketplace.
+
+VERDORA FOOD RESCUE
+
+"Good food deserves another chance."
+
+CTA: Explore Food Rescue.
+
+Use distinct visual treatments while retaining the same brand identity.
+
+## 4.6 Additional homepage sections
+
+Include:
+
+1. Hero.
+2. Live impact overview.
+3. Marketplace and Food Rescue.
+4. How VERDORA works.
+5. AI-powered features.
+6. Featured materials.
+7. Featured food donations.
+8. Sustainability impact story.
+9. Community rewards.
+10. Trust and quality.
+11. Frequently asked questions.
+12. Final CTA.
+13. Professional footer.
+
+Do not fill the homepage with fake testimonials.
+
+Only show genuine user feedback if it exists.
+
+---
+
+# PART 5 — VERDORA MARKETPLACE
+
+Create a comprehensive circular-material marketplace.
+
+## 5.1 Marketplace homepage
+
+Display:
+
+- Marketplace heading.
+- Search bar.
+- Category navigation.
+- Filters.
+- Sort controls.
+- Featured listings.
+- Recently added materials.
+- Recommended matches.
+- Listing cards.
+
+## 5.2 Material categories
+
+Include:
+
+- Metal.
+- Aluminium.
+- Steel.
+- Copper.
+- Plastic.
+- Paper.
+- Cardboard.
+- Wood.
+- Glass.
+- Textile.
+- Rubber.
+- Construction materials.
+- Electronic components.
+- Organic materials.
+- Other reusable materials.
+
+Allow administrators to manage categories if an admin system exists or is safely added.
+
+## 5.3 Listing cards
+
+Every material card should display:
+
+- Image.
+- Material name.
+- Category.
+- Quantity.
+- Unit.
+- Condition.
+- Location.
+- Indicative price, when provided.
+- Availability.
+- Seller information.
+- Match indicator, where applicable.
+- View Details button.
+- Contact Seller button.
+
+Do not show invented seller information.
+
+## 5.4 Search and filters
+
+Implement working filters for:
+
+- Material type.
+- Category.
+- Location.
+- Quantity.
+- Condition.
+- Price range, if relevant.
+- Availability.
+- Newest.
+- Most relevant.
+
+Filters must update actual displayed results.
+
+Provide clear filters and empty states.
+
+## 5.5 Material listing creation
+
+Create a polished listing form.
+
+Fields:
+
+- Material title.
+- Category.
+- Description.
+- Quantity.
+- Unit.
+- Condition.
+- Approximate location.
+- Indicative price, optional.
+- Images.
+- Available until.
+- Pickup preferences.
+- Reuse applications.
+- Seller contact information.
+
+Validate every field.
+
+Allow image preview and removal.
+
+Allow the user to edit the listing before publishing.
+
+## 5.6 Material listing detail page
+
+Include:
+
+- Image gallery.
+- Material details.
+- Quantity and unit.
+- Condition.
+- Description.
+- Location.
+- Seller information.
+- Reuse possibilities.
+- Similar materials.
+- AI matching suggestions.
+- WhatsApp contact.
+
+Make the page visually impressive but easy to read.
+
+## 5.7 Seller dashboard
+
+Allow sellers to:
+
+- Create listings.
+- Edit listings.
+- Pause listings.
+- Mark listings unavailable.
+- View requests.
+- View interested buyers.
+- Coordinate pickup.
+- Confirm completed handovers.
+- View their activity history.
+
+Do not delete a listing automatically when a request is received.
+
+---
+
+# PART 6 — AI MATERIAL SCANNER
+
+This is one of the most important differentiating features.
+
+## 6.1 User experience
+
+Create a dedicated scanner interface.
+
+The user can:
+
+- Upload an image.
+- Preview the image.
+- Enter optional context.
+- Start analysis.
+- Review the result.
+- Edit suggested information.
+- Create a marketplace listing.
+
+## 6.2 AI analysis
+
+The system should attempt to identify:
+
+- Likely material type.
+- Material category.
+- Visible condition.
+- Possible reuse applications.
+- Relevant quality questions.
+- Suggested listing title.
+- Suggested listing description.
+
+## 6.3 Scanner result layout
+
+Show:
+
+1. Uploaded image.
+2. Predicted material.
+3. Category.
+4. Confidence score, if returned by the actual model.
+5. Visible observations.
+6. Possible reuse applications.
+7. Quality checklist.
+8. Suggested listing content.
+9. Create Listing button.
+
+## 6.4 Accuracy and honesty
+
+Never claim the AI result is certified.
+
+Never claim image analysis determines exact composition or material grade.
+
+Show a disclaimer:
+
+"AI-generated material identification is an estimate. Verify material composition and quality before reuse or purchase."
+
+## 6.5 Technical requirements
+
+Use a real AI vision model when configured.
+
+If using Gemini:
+
+- Keep API keys server-side.
+- Validate uploaded files.
+- Limit image size.
+- Handle unsupported formats.
+- Handle API timeouts.
+- Handle rate limits.
+- Provide loading states.
+- Provide error states.
+
+If no model is configured, provide a transparent demo mode.
+
+Never pretend a real AI analysis occurred.
+
+---
+
+# PART 7 — SMART MATERIAL MATCHMAKING
+
+Build an intelligent matching experience.
+
+## 7.1 Buyer requirements
+
+Allow users to describe what they need.
+
+Example:
+
+"I need 200 kg of reusable aluminium for a small manufacturing project."
+
+Capture:
+
+- Material.
+- Category.
+- Quantity.
+- Unit.
+- Location.
+- Required condition.
+- Intended use.
+- Preferred collection date.
+
+## 7.2 Matching logic
+
+Match based on:
+
+- Material category.
+- Keywords.
+- Description.
+- Quantity compatibility.
+- Location.
+- Condition.
+- Availability.
+- Intended reuse.
+
+## 7.3 Match results
+
+Display:
+
+- Listing image.
+- Material name.
+- Match score.
+- Why it matches.
+- Quantity compatibility.
+- Location.
+- Condition.
+- Availability.
+- Contact action.
+
+## 7.4 Match explanations
+
+Example:
+
+"Strong match because this listing contains aluminium, is available in your requested quantity range, and is located in your selected area."
+
+Avoid mysterious scores.
+
+If matching is rule-based, call it a relevance score.
+
+Do not claim machine-learning matchmaking unless a real model is configured.
+
+## 7.5 Smart recommendations
+
+Include:
+
+- Similar materials.
+- Alternative materials.
+- Potential reuse suggestions.
+- Relevant listings.
+- New matching listings.
+
+---
+
+# PART 8 — VERDORA FOOD RESCUE
+
+Food Rescue is a core product, not a secondary feature.
+
+It must have its own polished experience.
+
+## 8.1 Visual identity
+
+Use:
+
+- Sage green.
+- Warm cream.
+- Ivory.
+- Fresh produce photography.
+- Friendly but professional typography.
+- Natural visual details.
+
+Headline:
+
+"Good Food Deserves Another Chance."
+
+Description:
+
+"Connect surplus food with people and communities who can put it to good use."
+
+Main actions:
+
+- Donate Food.
+- Find Available Food.
+- Learn How It Works.
+
+## 8.2 Donor experience
+
+Allow donors to create a donation.
+
+Fields:
+
+- Food name.
+- Description.
+- Food category.
+- Quantity.
+- Number of portions.
+- Preparation date/time, if known.
+- Available until.
+- Pickup deadline.
+- Storage information.
+- Packaging information.
+- Known allergens.
+- Dietary information.
+- Pickup location.
+- Images.
+- Contact information.
+
+## 8.3 Food categories
+
+Include:
+
+- Cooked meals.
+- Fresh vegetables.
+- Fruits.
+- Bakery items.
+- Packaged food.
+- Grains.
+- Dairy products.
+- Other eligible food.
+
+## 8.4 Food discovery
+
+Users should be able to:
+
+- Browse donations.
+- Search by food name.
+- Filter by category.
+- Filter by location.
+- Filter by quantity.
+- Filter by availability.
+- Sort by collection deadline.
+- View detailed donation information.
+- Contact donors.
+
+## 8.5 Donation detail page
+
+Show:
+
+- Food image.
+- Food name.
+- Description.
+- Quantity.
+- Portions.
+- Available until.
+- Preparation information.
+- Storage information.
+- Known allergens.
+- Pickup location.
+- Collection instructions.
+- Donor details.
+- Request or contact action.
+
+## 8.6 Recipient workflow
+
+The workflow must be:
+
+1. Donor publishes an eligible donation.
+2. Recipient discovers the donation.
+3. Recipient expresses interest or requests collection.
+4. Donor reviews the request.
+5. Donor accepts or declines.
+6. Participants coordinate through WhatsApp.
+7. Collection is arranged.
+8. Handover is confirmed.
+9. Impact dashboard updates.
+
+## 8.7 Food donation statuses
+
+Use controlled statuses:
+
+- Available.
+- Request Received.
+- Accepted.
+- Coordination In Progress.
+- Pickup Scheduled.
+- Completed.
+- Cancelled.
+- Expired.
+
+Prevent two recipients from claiming the same remaining quantity.
+
+Prevent duplicate completion records.
+
+## 8.8 Food safety
+
+Food Rescue is a coordination platform, not a food-safety certification system.
+
+Include clear food handling information.
+
+Encourage accurate disclosure of:
+
+- Preparation time.
+- Storage conditions.
+- Known allergens.
+- Collection deadline.
+- Packaging.
+
+Never label food as safe merely because an AI model says so.
+
+Do not recommend distributing food that appears unsafe or has uncertain handling conditions.
+
+Provide a clear warning when important food information is missing.
+
+---
+
+# PART 9 — SMART PICKUP AND DELIVERY COORDINATION
+
+Create a coordinated pickup experience.
+
+## 9.1 Material pickup
+
+Show:
+
+- Listing.
+- Buyer.
+- Seller.
+- Pickup area.
+- Preferred date.
+- Preferred time.
+- Pickup instructions.
+- Current status.
+
+## 9.2 Food pickup
+
+Show:
+
+- Donation.
+- Donor.
+- Recipient.
+- Collection deadline.
+- Pickup location.
+- Collection instructions.
+- Current status.
+
+## 9.3 Status timeline
+
+Display a visual timeline:
+
+Request Created
+→ Accepted
+→ Coordination
+→ Pickup Scheduled
+→ Collected
+→ Completed
+
+## 9.4 Coordination
+
+Allow participants to:
+
+- Propose a pickup time.
+- Confirm a pickup time.
+- Update status.
+- Add notes.
+- Contact through WhatsApp.
+
+Do not claim live GPS tracking or driver routing without an actual integration.
+
+Do not invent delivery partners.
+
+---
+
+# PART 10 — LIVE ECO IMPACT DASHBOARD
+
+Build an attractive impact dashboard.
+
+## 10.1 Core metrics
+
+Display:
+
+- Total materials recovered.
+- Total material handovers completed.
+- Total food portions rescued.
+- Completed food handovers.
+- Active material listings.
+- Active food donations.
+- Community contributions.
+- Estimated environmental impact where methodology supports it.
+
+## 10.2 Dashboard visualizations
+
+Use:
+
+- Animated number counters.
+- Line charts.
+- Bar charts.
+- Category breakdowns.
+- Activity timelines.
+- Progress indicators.
+- Geographic distribution only when location data supports it.
+
+## 10.3 Impact calculations
+
+Only calculate totals from eligible records.
+
+Separate:
+
+- Active.
+- Pending.
+- Accepted.
+- Completed.
+- Cancelled.
+- Expired.
+
+Never count pending records as completed impact.
+
+Prevent duplicate counting.
+
+Do not convert unrelated quantities into kilograms.
+
+Do not claim independently verified carbon savings.
+
+If CO2e estimates are introduced, document the calculation method, source factors, assumptions, and limitations.
+
+If a figure is estimated, label it clearly.
+
+## 10.4 Personal impact
+
+Give each user a personal impact page.
+
+Show:
+
+- Their completed material contributions.
+- Their completed food handovers.
+- Their contribution history.
+- Their earned points.
+- Their achievements.
+
+---
+
+# PART 11 — GREEN REWARDS AND LEADERBOARD
+
+Create a premium community motivation system.
+
+## 11.1 Reward activities
+
+Possible achievements:
+
+- First Material Listing.
+- First Completed Material Handover.
+- Food Rescue Contributor.
+- Community Champion.
+- Circular Economy Pioneer.
+- Sustainability Supporter.
+
+## 11.2 Points
+
+Award points only for qualifying completed actions.
+
+Examples:
+
+- Completed eligible material handover.
+- Completed food handover.
+- Verified contribution.
+- Approved community activity.
+
+Do not award points for fake or duplicated activity.
+
+## 11.3 Leaderboard
+
+Include:
+
+- Weekly leaderboard.
+- Monthly leaderboard.
+- All-time leaderboard.
+- User ranking.
+- Achievement badges.
+- Contribution totals.
+
+Protect personal information.
+
+Only display information users have agreed to make public.
+
+Points are recognition scores, not cash.
+
+Do not create financial reward or payment features.
+
+---
+
+# PART 12 — VERDORA ECO AI ASSISTANT
+
+Create an AI assistant for sustainability and circular economy.
+
+## 12.1 Assistant capabilities
+
+Help users:
+
+- Identify reusable materials.
+- Discover reuse opportunities.
+- Understand circular economy concepts.
+- Improve material descriptions.
+- Understand responsible waste sorting.
+- Create better marketplace listings.
+- Understand Food Rescue workflows.
+- Interpret impact dashboard metrics.
+- Navigate VERDORA.
+
+## 12.2 Example questions
+
+"What can I do with leftover wooden pallets?"
+
+"How can I list surplus aluminium?"
+
+"What materials can be reused in construction?"
+
+"How do I donate surplus food?"
+
+"How does VERDORA calculate its impact?"
+
+## 12.3 UI
+
+Include:
+
+- Conversational interface.
+- Message bubbles.
+- Suggested prompts.
+- Loading indicator.
+- Error handling.
+- Clear conversation history.
+- Mobile-responsive layout.
+
+## 12.4 Gemini integration
+
+Use a real Gemini model only when properly configured.
+
+API keys must remain server-side.
+
+Use a secure backend proxy.
+
+Do not expose private keys in frontend source code.
+
+Handle:
+
+- Network failures.
+- Rate limits.
+- Invalid input.
+- API errors.
+- Empty responses.
+
+If the API is not configured, provide a clearly labelled fallback assistant.
+
+---
+
+# PART 13 — TRUST AND QUALITY VERIFICATION
+
+Build a transparent trust system.
+
+## 13.1 Material quality information
+
+Display:
+
+- Material type.
+- Quantity.
+- Condition.
+- Quality notes.
+- Images.
+- Location.
+- Seller information.
+- Listing status.
+
+## 13.2 Food listing information
+
+Display:
+
+- Food type.
+- Quantity.
+- Portions.
+- Preparation time.
+- Storage information.
+- Known allergens.
+- Collection deadline.
+- Donor information.
+
+## 13.3 Verification workflow
+
+Possible statuses:
+
+- Not Submitted.
+- Submitted.
+- Under Review.
+- Approved.
+- Rejected.
+- More Information Required.
+
+Only authorised reviewers can approve verification.
+
+Never automatically award a verified badge because a user uploaded a document.
+
+Never claim official certification unless the relevant process has actually happened.
+
+## 13.4 Reporting
+
+Allow users to report:
+
+- Misleading listings.
+- Duplicate listings.
+- Incorrect quantities.
+- Suspicious activity.
+- Inappropriate content.
+
+Provide an admin review workflow.
+
+---
+
+# PART 14 — ADMINISTRATION AND PLATFORM MANAGEMENT
+
+If the existing architecture supports an admin dashboard, improve it. Otherwise, add a secure admin area only when the current authentication and backend can support it safely.
+
+## Admin capabilities
+
+- View platform overview.
+- Manage material categories.
+- Review listings.
+- Review food donations.
+- View user reports.
+- Review verification requests.
+- Manage inappropriate listings.
+- View completed handovers.
+- View impact analytics.
+- Review audit history.
+
+## Security
+
+- Require proper admin authorization.
+- Never rely only on hiding frontend buttons.
+- Enforce permissions on the server.
+- Record consequential admin actions.
+- Protect user information.
+
+Do not create a fake admin login that bypasses authentication.
+
+---
+
+# PART 15 — WHATSAPP INTEGRATION
+
+WhatsApp is the primary participant communication channel.
+
+No online payment functionality.
+
+## 15.1 Material message
+
+Suggested message:
+
+"Hi, I found your material listing on VERDORA. I am interested and would like to know more about the material, quantity, condition and pickup arrangements."
+
+## 15.2 Food Rescue message
+
+Suggested message:
+
+"Hi, I found your food donation on VERDORA. I would like to coordinate collection. Could you confirm availability, portions and collection timing?"
+
+## 15.3 Requirements
+
+- Use the actual contact number.
+- Validate phone number format.
+- Encode message parameters.
+- Handle missing numbers.
+- Make links work on mobile and desktop.
+- Avoid exposing unnecessary private information.
+
+Never invent contact numbers.
+
+---
+
+# PART 16 — ADDITIONAL HIGH-VALUE FEATURES
+
+Add these only if they fit the existing architecture and do not compromise the core product.
+
+## 16.1 Saved listings
+
+Users can bookmark materials and food donations.
+
+## 16.2 Listing comparison
+
+Allow users to compare material listings by:
+
+- Category.
+- Quantity.
+- Condition.
+- Location.
+- Price, if available.
+
+## 16.3 Smart reuse ideas
+
+Show alternative uses for material listings.
+
+Example:
+
+Wooden pallets:
+- Storage furniture.
+- Garden structures.
+- Packaging reuse.
+- Workshop projects.
+
+These must be suggestions, not guarantees of suitability.
+
+## 16.4 Activity feed
+
+Show a clear history of:
+
+- Listings created.
+- Requests submitted.
+- Requests accepted.
+- Pickups scheduled.
+- Handovers completed.
+- Rewards earned.
+
+## 16.5 Notifications
+
+Add in-app notifications for:
+
+- New matching materials.
+- Request received.
+- Request accepted.
+- Pickup confirmed.
+- Donation approaching its deadline.
+- Handover completed.
+- Reward earned.
+
+Only claim real-time notifications if a real notification mechanism is configured.
+
+## 16.6 Shareable impact card
+
+Allow users to create a shareable impact summary.
+
+It should include only actual recorded achievements.
+
+Do not include private user information.
+
+## 16.7 Demo mode
+
+Create a clearly labelled hackathon demo mode if necessary.
+
+It may contain illustrative sample listings and activity.
+
+Mark all simulated data as DEMO.
+
+Never mix fake records into actual environmental impact totals.
+
+---
+
+# PART 17 — DATABASE AND BACKEND ARCHITECTURE
+
+Inspect the existing backend before modifying it.
+
+Preserve existing infrastructure.
+
+Create or improve appropriate data models for:
+
+- User.
+- User Profile.
+- Material Category.
+- Material Listing.
+- Material Request.
+- Food Donation.
+- Food Request.
+- Pickup Coordination.
+- Handover.
+- Verification Request.
+- Report.
+- Reward.
+- Achievement.
+- Notification.
+- Impact Record.
+- Audit Log.
+
+## 17.1 Data integrity
+
+Enforce:
+
+- Valid quantities.
+- Valid units.
+- Required fields.
+- Valid statuses.
+- Correct ownership.
+- Duplicate prevention.
+- Permission checks.
+- Consistent relationships.
+
+## 17.2 State transitions
+
+Use server-side workflow validation.
+
+For example:
+
+An unavailable donation cannot be accepted.
+
+A completed handover cannot be completed again.
+
+A cancelled request cannot be silently converted into a completed handover.
+
+A user cannot edit another user's private listing without permission.
+
+## 17.3 Data security
+
+- Never expose secrets.
+- Validate server-side inputs.
+- Use secure authentication.
+- Enforce authorization.
+- Limit upload types and sizes.
+- Handle malicious input.
+- Apply appropriate database access policies.
+- Keep sensitive information private.
+- Maintain audit history for important actions.
+
+## 17.4 Preserve data
+
+Do not delete existing records.
+
+Do not replace the existing database with localStorage.
+
+Do not migrate data destructively.
+
+Use migrations and backups when appropriate.
+
+---
+
+# PART 18 — PREMIUM UI COMPONENTS AND ANIMATION
+
+Use the GitHub animation references selectively.
+
+Study:
+
+https://github.com/ColorlibHQ/velora-ui
+
+https://github.com/itsjwill/motion-primitives-website
+
+Use these patterns where appropriate:
+
+- Scroll reveal.
+- Staggered card appearance.
+- Animated number counters.
+- Premium navigation.
+- Smooth tabs.
+- Image reveal.
+- Subtle parallax.
+- Refined modal transitions.
+- Interactive cards.
+- Loading skeletons.
+- Animated timeline.
+- Smooth page transitions.
+
+Do not use every animation component.
+
+Choose only effects that support the VERDORA brand.
+
+## Motion principles
+
+Animations should be:
+
+- Smooth.
+- Subtle.
+- Intentional.
+- Fast enough for usability.
+- Accessible.
+- Mobile-friendly.
+- Performance-conscious.
+
+Respect prefers-reduced-motion.
+
+Avoid heavy 3D effects that reduce performance.
+
+Do not sacrifice functionality for visual effects.
+
+---
+
+# PART 19 — RESPONSIVE DESIGN
+
+Test the full application at:
+
+- 360px mobile.
+- 390px mobile.
+- 430px mobile.
+- 768px tablet.
+- 1024px laptop.
+- 1366px desktop.
+- 1920px large desktop.
+
+Check:
+
+- Navigation.
+- Hero.
+- Forms.
+- Cards.
+- Dashboards.
+- Charts.
+- Modals.
+- Image galleries.
+- Search and filters.
+- Food Rescue.
+- Marketplace.
+- Footer.
+
+No horizontal overflow.
+
+No cut-off buttons.
+
+No unreadable text.
+
+No overlapping content.
+
+Mobile must feel like a carefully designed application, not a compressed desktop website.
+
+---
+
+# PART 20 — ACCESSIBILITY AND USABILITY
+
+Implement:
+
+- Semantic HTML.
+- Proper labels.
+- Keyboard navigation.
+- Visible focus indicators.
+- Sufficient colour contrast.
+- Accessible buttons.
+- Alt text.
+- Error descriptions.
+- Screen-reader-friendly status changes.
+- Reduced-motion support.
+
+Every primary button must work.
+
+Every form must validate.
+
+Every modal must be accessible.
+
+Every page must have a clear purpose.
+
+No decorative element should block important interaction.
+
+---
+
+# PART 21 — PERFORMANCE AND RELIABILITY
+
+Optimize:
+
+- Images.
+- Video.
+- Fonts.
+- Code splitting.
+- Lazy loading.
+- API calls.
+- Component rendering.
+- Database queries.
+
+Avoid:
+
+- Unnecessary dependencies.
+- Duplicate API calls.
+- Huge unoptimized images.
+- Excessive animation loops.
+- Unnecessary polling.
+- Blocking page loads.
+
+Handle network failure gracefully.
+
+Provide loading, success, empty and error states.
+
+---
+
+# PART 22 — SECURITY REQUIREMENTS
+
+Check:
+
+- Authentication.
+- Authorization.
+- Role permissions.
+- API validation.
+- Upload validation.
+- Environment variables.
+- Database rules.
+- CORS configuration.
+- Error handling.
+- Rate limiting where appropriate.
+
+Never put API secrets in frontend code.
+
+Never commit .env files containing secrets.
+
+Never use real personal contact details in sample data.
+
+Do not weaken security to make a demo easier.
+
+---
+
+# PART 23 — TESTING AND QUALITY ASSURANCE
+
+Testing is mandatory.
+
+Do not simply say that everything works.
+
+Actually execute the available tests.
+
+## Test group A — Homepage
+
+- Homepage loads.
+- Navigation works.
+- Hero actions work.
+- Video fallback works.
+- Impact preview loads.
+- Mobile navigation works.
+
+## Test group B — Marketplace
+
+- Listing creation.
+- Listing editing.
+- Image preview.
+- Validation.
+- Search.
+- Filters.
+- Sorting.
+- Listing details.
+- Seller contact.
+- Saved listings.
+
+## Test group C — AI Material Scanner
+
+- Image upload.
+- Invalid file handling.
+- Analysis request.
+- Result display.
+- Error handling.
+- Listing generation.
+
+## Test group D — Matchmaking
+
+- Buyer requirement creation.
+- Matching results.
+- Match explanations.
+- Quantity compatibility.
+- Location filtering.
+
+## Test group E — Food Rescue
+
+- Food donation creation.
+- Validation.
+- Food discovery.
+- Filters.
+- Recipient request.
+- Donor acceptance.
+- Donor decline.
+- Pickup coordination.
+- Handover confirmation.
+- Duplicate prevention.
+- Expired listing handling.
+
+## Test group F — Impact
+
+- Completed material totals.
+- Completed food portions.
+- Active listings.
+- Pending requests.
+- Duplicate protection.
+- Estimated impact labels.
+- Empty states.
+
+## Test group G — Rewards
+
+- Points calculation.
+- Duplicate prevention.
+- Achievement unlocking.
+- Leaderboard accuracy.
+
+## Test group H — AI Assistant
+
+- Message submission.
+- API integration.
+- Error handling.
+- Loading state.
+- Fallback mode.
+
+## Test group I — WhatsApp
+
+- Correct phone number.
+- Correct encoded message.
+- Missing contact handling.
+- Mobile and desktop link behaviour.
+
+## Test group J — Security
+
+- Unauthorized access.
+- Role restrictions.
+- Invalid inputs.
+- Upload restrictions.
+- Secret exposure.
+- Database access.
+
+## Test group K — Responsive layout
+
+Test all major screens at mobile, tablet and desktop sizes.
+
+## Test group L — Final build
+
+Run:
+
+npm install
+
+npm run build
+
+Run the available test command from package.json.
+
+Fix actual errors.
+
+Do not report an unexecuted test as passed.
+
+---
+
+# PART 24 — HACKATHON DEMONSTRATION EXPERIENCE
+
+The product must communicate its purpose in 10 seconds.
+
+A judge should immediately understand:
+
+1. What VERDORA does.
+2. What problem it solves.
+3. Who benefits.
+4. How AI improves the process.
+5. How Food Rescue works.
+6. How the impact is measured.
+
+Create a polished demonstration journey.
+
+## Demo 1 — Material Scanner
+
+1. Open VERDORA Market.
+2. Upload a material image.
+3. Run the AI-assisted scanner.
+4. Display the material result.
+5. Generate a listing.
+6. Publish the listing.
+
+## Demo 2 — Smart Matchmaking
+
+1. Enter a buyer requirement.
+2. Run matching.
+3. Show relevant listings.
+4. Explain why they match.
+5. Open a listing.
+6. Start WhatsApp coordination.
+
+## Demo 3 — Food Rescue
+
+1. Open Food Rescue.
+2. Create a donation.
+3. Display the available food.
+4. Discover the donation as a recipient.
+5. Submit interest.
+6. Coordinate through WhatsApp.
+7. Confirm a completed handover.
+
+## Demo 4 — Impact
+
+1. Open the dashboard.
+2. Show completed handovers.
+3. Show material quantities.
+4. Show food portions.
+5. Show rewards.
+6. Explain the calculation methodology.
+
+The entire demonstration should be smooth and easy to follow.
+
+Use clearly labelled demo records where real data is not available.
+
+Never fabricate partnerships, real-world donations, or completed handovers.
+
+---
+
+# PART 25 — PROJECT DOCUMENTATION
+
+Improve the GitHub README.
+
+Include:
+
+- Project introduction.
+- Problem statement.
+- Solution.
+- Product features.
+- Architecture.
+- Technology stack.
+- Screenshots.
+- Setup instructions.
+- Environment variables.
+- API configuration.
+- Database setup.
+- Testing instructions.
+- Demo instructions.
+- Known limitations.
+- Licence information.
+
+Create or update:
+
+- CONTRIBUTING.md.
+- .env.example.
+- Architecture documentation.
+- Feature documentation.
+- Testing documentation.
+
+Do not include private credentials.
+
+---
+
+# PART 26 — GITHUB DEVELOPMENT WORKFLOW
+
+Use GitHub as the central source of truth.
+
+## Step 1 — Inspect
+
+Connect to the existing repository.
+
+Inspect the source tree.
+
+Understand the current branch and latest commit.
+
+## Step 2 — Create safe working branch
+
+Create:
+
+feature/verdora-hackathon-upgrade
+
+Do not overwrite the main branch.
+
+## Step 3 — Plan
+
+Create a detailed implementation plan.
+
+Identify files to modify.
+
+Identify new files required.
+
+Identify database changes.
+
+Identify external integrations.
+
+## Step 4 — Implement
+
+Make small, logical changes.
+
+Preserve existing functionality.
+
+Keep code modular.
+
+Use reusable components.
+
+Avoid duplicating existing logic.
+
+## Step 5 — Test
+
+Run build and tests.
+
+Fix errors before continuing.
+
+## Step 6 — Review
+
+Inspect the changed files.
+
+Check for:
+
+- Broken imports.
+- Duplicate components.
+- Missing environment variables.
+- Dead buttons.
+- Broken routes.
+- Security problems.
+- TypeScript errors.
+- Responsive issues.
+
+## Step 7 — Commit
+
+Use meaningful commit messages.
+
+Examples:
+
+feat: improve AI material scanner
+
+feat: enhance food rescue workflow
+
+feat: add smart material matching
+
+feat: improve impact analytics
+
+design: implement premium organic interface
+
+fix: prevent duplicate handover counting
+
+## Step 8 — Report
+
+Provide:
+
+- Branch name.
+- Files modified.
+- Features implemented.
+- Tests run.
+- Build result.
+- Remaining issues.
+
+Do not push directly to main unless explicitly authorised.
+
+Do not merge changes without approval.
+
+---
+
+# PART 27 — IMPLEMENTATION PHASES
+
+Work in the following order.
+
+PHASE 1 — FULL AUDIT
+
+Inspect GitHub.
+
+Inspect the live product.
+
+Inspect code.
+
+Inspect backend.
+
+Inspect database.
+
+Inspect tests.
+
+Create a feature status report.
+
+PHASE 2 — ARCHITECTURE
+
+Prepare the implementation plan.
+
+Identify reusable components.
+
+Identify data models.
+
+Identify missing integrations.
+
+PHASE 3 — DESIGN SYSTEM
+
+Implement the premium organic visual system.
+
+Improve typography.
+
+Improve navigation.
+
+Improve cards.
+
+Improve buttons.
+
+Improve forms.
+
+PHASE 4 — HOMEPAGE
+
+Build the cinematic hero.
+
+Build impact preview.
+
+Highlight Marketplace and Food Rescue.
+
+Improve homepage storytelling.
+
+PHASE 5 — MARKETPLACE
+
+Improve listing creation.
+
+Improve discovery.
+
+Improve search.
+
+Improve filters.
+
+Improve listing details.
+
+PHASE 6 — AI FEATURES
+
+Improve Material Scanner.
+
+Improve Smart Matching.
+
+Improve Eco AI Assistant.
+
+PHASE 7 — FOOD RESCUE
+
+Improve donor experience.
+
+Improve recipient experience.
+
+Improve donation workflows.
+
+Improve handover coordination.
+
+PHASE 8 — IMPACT AND REWARDS
+
+Improve analytics.
+
+Improve impact calculations.
+
+Improve rewards.
+
+Improve leaderboard.
+
+PHASE 9 — TRUST AND ADMIN
+
+Improve verification.
+
+Improve reporting.
+
+Improve moderation.
+
+Improve audit records.
+
+PHASE 10 — QUALITY
+
+Test functionality.
+
+Test mobile.
+
+Test accessibility.
+
+Test security.
+
+Optimize performance.
+
+PHASE 11 — DELIVERY
+
+Update documentation.
+
+Prepare demo scenarios.
+
+Summarize implementation.
+
+Report limitations.
+
+---
+
+# PART 28 — DEFINITION OF DONE
+
+The project is not complete simply because it looks attractive.
+
+It is complete only when the following conditions are met.
+
+DESIGN:
+
+- Premium VERDORA identity.
+- Consistent visual system.
+- Responsive layout.
+- Professional homepage.
+- Distinct Food Rescue experience.
+- Cinematic background support.
+
+FUNCTIONALITY:
+
+- Marketplace works.
+- Listings work.
+- Search works.
+- Filters work.
+- Material Scanner works or has a clearly labelled fallback.
+- Smart Matching works.
+- Food Rescue works.
+- Pickup coordination works.
+- WhatsApp actions work.
+- Impact calculations work.
+- Rewards work.
+- Eco AI Assistant works or has a clearly labelled fallback.
+
+RELIABILITY:
+
+- Forms validate.
+- No dead buttons.
+- No broken routes.
+- No duplicate handovers.
+- No fake impact figures.
+- No exposed API keys.
+- No broken mobile layouts.
+- No unhandled critical errors.
+
+GITHUB:
+
+- Existing repository preserved.
+- Changes tracked.
+- Working branch used.
+- Documentation updated.
+- Tests reported accurately.
+
+---
+
+# FINAL INSTRUCTIONS
+
+I want VERDORA to look like a premium international sustainability technology startup.
+
+I want it to be visually impressive, intelligently designed, and genuinely useful.
+
+Do not make a generic template.
+
+Do not build a disconnected replacement.
+
+Do not stop after making the homepage beautiful.
+
+Do not create fake AI functionality.
+
+Do not introduce payment functionality.
+
+Do not fabricate environmental impact.
+
+Do not invent partnerships or verification.
+
+Do not claim features are tested when they have not been tested.
+
+Use GitHub as the source of truth.
+
+Research first.
+
+Audit second.
+
+Plan third.
+
+Implement carefully.
+
+Test everything possible.
+
+Improve the existing project instead of destroying it.
+
+The final application must communicate one powerful idea:
+
+**VERDORA — Give Every Resource a Second Life.**
+
+Begin with the GitHub repository audit and provide the complete findings before making major changes.

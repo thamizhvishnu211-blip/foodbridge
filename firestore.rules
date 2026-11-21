@@ -1,0 +1,730 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        || request.auth.token.email == 'thamizh.vishnu211@gmail.com'
+      );
+    }
+
+    function isValidAccountType(val) {
+      return val is string && val in [
+        'general_user',
+        'buyer',
+        'material_buyer',
+        'material_supplier',
+        'restaurant_donor',
+        'food_recipient',
+        'industrial_buyer',
+        'oil_collection_partner',
+        'recycling_processor'
+      ];
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'accountType', 'createdAt', 'lastLoginAt'])
+        && data.keys().hasOnly(['uid', 'name', 'email', 'avatarUrl', 'accountType', 'createdAt', 'lastLoginAt'])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.email == request.auth.token.email
+        && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 500))
+        && isValidAccountType(data.accountType)
+        && data.createdAt is timestamp
+        && data.lastLoginAt is timestamp;
+    }
+
+    function isValidSavedItem(data, savedId) {
+      return data.keys().hasAll(['id', 'userUid', 'itemType', 'itemId', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userUid', 'itemType', 'itemId', 'createdAt'])
+        && isValidId(data.id)
+        && data.id == savedId
+        && isValidId(data.userUid)
+        && data.userUid == request.auth.uid
+        && data.itemType is string && data.itemType in ['material', 'food']
+        && isValidId(data.itemId)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidMaterialListing(data, listingId) {
+      return data.keys().hasAll([
+          'id', 'sellerId', 'sellerUid', 'sellerName', 'sellerOrganization', 'sellerVerified',
+          'title', 'category', 'description', 'quantity', 'unit', 'condition', 'location',
+          'currency', 'imageUrl', 'availableUntil', 'pickupPreferences', 'reuseApplications',
+          'status', 'isHidden', 'isPublic', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'sellerId', 'sellerUid', 'sellerName', 'sellerOrganization', 'sellerVerified',
+          'title', 'category', 'description', 'quantity', 'unit', 'condition', 'location',
+          'indicativePrice', 'currency', 'imageUrl', 'availableUntil', 'pickupPreferences',
+          'reuseApplications', 'hasWhatsapp', 'verificationId', 'aiVerificationStatus',
+          'completedByRequestId', 'status', 'isHidden', 'isPublic',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == listingId
+        && isValidId(data.sellerId)
+        && isValidId(data.sellerUid)
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120
+        && data.sellerOrganization is string && data.sellerOrganization.size() <= 140
+        && data.sellerVerified is bool
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 1500
+        && (data.quantity is number || data.quantity is int) && data.quantity > 0
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 24
+        && data.condition is string && data.condition.size() >= 1 && data.condition.size() <= 60
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 120
+        && (!('indicativePrice' in data) || data.indicativePrice == null || ((data.indicativePrice is number || data.indicativePrice is int) && data.indicativePrice >= 0))
+        && data.currency is string && data.currency == 'INR'
+        && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 750000
+        && data.availableUntil is string && data.availableUntil.size() >= 4 && data.availableUntil.size() <= 64
+        && data.pickupPreferences is string && data.pickupPreferences.size() <= 300
+        && data.reuseApplications is list && data.reuseApplications.size() <= 8
+        && (data.reuseApplications.size() == 0 || (data.reuseApplications[0] is string && data.reuseApplications[0].size() <= 120))
+        && (!('hasWhatsapp' in data) || data.hasWhatsapp is bool)
+        && (!('verificationId' in data) || data.verificationId == null || (data.verificationId is string && data.verificationId.size() <= 128))
+        && (!('aiVerificationStatus' in data) || data.aiVerificationStatus == null || (data.aiVerificationStatus is string && data.aiVerificationStatus.size() <= 64))
+        && (!('completedByRequestId' in data) || isValidId(data.completedByRequestId))
+        && data.status is string && data.status in ['Active', 'Paused', 'Unavailable', 'Completed', 'Cancelled']
+        && data.isHidden is bool
+        && data.isPublic is bool
+        && data.isPublic == (data.isHidden == false && !(data.status in ['Completed', 'Cancelled']))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFoodDonation(data, donationId) {
+      return data.keys().hasAll([
+          'id', 'donorId', 'donorUid', 'donorName', 'donorOrganization', 'donorVerified',
+          'title', 'description', 'category', 'quantity', 'unit', 'portions', 'remainingPortions',
+          'availableUntil', 'pickupDeadline', 'storageInfo', 'packagingInfo', 'allergens',
+          'dietaryInfo', 'location', 'collectionInstructions', 'imageUrl', 'status',
+          'isHidden', 'isPublic', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'donorId', 'donorUid', 'donorName', 'donorOrganization', 'donorVerified',
+          'title', 'description', 'category', 'quantity', 'unit', 'portions', 'remainingPortions',
+          'preparedAt', 'availableUntil', 'pickupDeadline', 'storageInfo', 'packagingInfo',
+          'allergens', 'dietaryInfo', 'location', 'collectionInstructions', 'imageUrl',
+          'hasWhatsapp', 'verificationId', 'aiVerificationStatus', 'completedByRequestId',
+          'status', 'isHidden', 'isPublic', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == donationId
+        && isValidId(data.donorId)
+        && isValidId(data.donorUid)
+        && data.donorName is string && data.donorName.size() >= 1 && data.donorName.size() <= 120
+        && data.donorOrganization is string && data.donorOrganization.size() <= 140
+        && data.donorVerified is bool
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 1500
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && (data.quantity is number || data.quantity is int) && data.quantity > 0
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 24
+        && data.portions is int && data.portions > 0
+        && data.remainingPortions is int && data.remainingPortions >= 0 && data.remainingPortions <= data.portions
+        && (!('preparedAt' in data) || data.preparedAt == null || (data.preparedAt is string && data.preparedAt.size() <= 64))
+        && data.availableUntil is string && data.availableUntil.size() >= 4 && data.availableUntil.size() <= 64
+        && data.pickupDeadline is string && data.pickupDeadline.size() >= 4 && data.pickupDeadline.size() <= 64
+        && data.storageInfo is string && data.storageInfo.size() <= 300
+        && data.packagingInfo is string && data.packagingInfo.size() <= 300
+        && data.allergens is string && data.allergens.size() <= 300
+        && data.dietaryInfo is string && data.dietaryInfo.size() <= 200
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 120
+        && data.collectionInstructions is string && data.collectionInstructions.size() <= 400
+        && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 750000
+        && (!('hasWhatsapp' in data) || data.hasWhatsapp is bool)
+        && (!('verificationId' in data) || data.verificationId == null || (data.verificationId is string && data.verificationId.size() <= 128))
+        && (!('aiVerificationStatus' in data) || data.aiVerificationStatus == null || (data.aiVerificationStatus is string && data.aiVerificationStatus.size() <= 64))
+        && (!('completedByRequestId' in data) || isValidId(data.completedByRequestId))
+        && data.status is string && data.status in [
+          'Available', 'Request Received', 'Accepted', 'Coordination In Progress',
+          'Pickup Scheduled', 'Completed', 'Cancelled', 'Expired'
+        ]
+        && data.isHidden is bool
+        && data.isPublic is bool
+        && data.isPublic == (data.isHidden == false && !(data.status in ['Completed', 'Cancelled', 'Expired']))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOilListing(data, oilId) {
+      return data.keys().hasAll([
+          'id', 'supplierId', 'supplierUid', 'supplierName', 'supplierOrganization', 'supplierVerified',
+          'title', 'oilType', 'volumeLiters', 'qualityGrade', 'containerType', 'filtrationStatus',
+          'pickupWindow', 'location', 'collectionStatus', 'isHidden', 'isPublic', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'supplierId', 'supplierUid', 'supplierName', 'supplierOrganization', 'supplierVerified',
+          'title', 'oilType', 'volumeLiters', 'qualityGrade', 'containerType', 'filtrationStatus',
+          'pickupWindow', 'location', 'collectionStatus', 'hasWhatsapp', 'verificationId',
+          'aiVerificationStatus', 'completedByEnquiryId', 'isHidden', 'isPublic',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == oilId
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierUid)
+        && data.supplierName is string && data.supplierName.size() >= 1 && data.supplierName.size() <= 120
+        && data.supplierOrganization is string && data.supplierOrganization.size() <= 140
+        && data.supplierVerified is bool
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.oilType is string && data.oilType.size() >= 2 && data.oilType.size() <= 80
+        && (data.volumeLiters is number || data.volumeLiters is int) && data.volumeLiters > 0
+        && data.qualityGrade is string && data.qualityGrade.size() >= 1 && data.qualityGrade.size() <= 60
+        && data.containerType is string && data.containerType.size() >= 1 && data.containerType.size() <= 80
+        && data.filtrationStatus is string && data.filtrationStatus.size() >= 1 && data.filtrationStatus.size() <= 80
+        && data.pickupWindow is string && data.pickupWindow.size() >= 1 && data.pickupWindow.size() <= 140
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 120
+        && data.collectionStatus is string && data.collectionStatus in [
+          'Available', 'Enquiry Pending', 'Scheduled', 'Collected', 'Processed', 'Paused', 'Cancelled'
+        ]
+        && (!('hasWhatsapp' in data) || data.hasWhatsapp is bool)
+        && (!('verificationId' in data) || data.verificationId == null || (data.verificationId is string && data.verificationId.size() <= 128))
+        && (!('aiVerificationStatus' in data) || data.aiVerificationStatus == null || (data.aiVerificationStatus is string && data.aiVerificationStatus.size() <= 64))
+        && (!('completedByEnquiryId' in data) || isValidId(data.completedByEnquiryId))
+        && data.isHidden is bool
+        && data.isPublic is bool
+        && data.isPublic == (data.isHidden == false && !(data.collectionStatus in ['Processed', 'Cancelled']))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMaterialRequest(data, reqId) {
+      return data.keys().hasAll([
+          'id', 'listingId', 'listingTitle', 'listingCategory', 'listingUnit', 'listingLocation',
+          'sellerId', 'sellerUid', 'sellerName', 'buyerId', 'buyerUid', 'buyerName',
+          'requestedQuantity', 'intendedUse', 'preferredDate', 'preferredTime', 'arrangement',
+          'notes', 'status', 'handoverConfirmedByBuyer', 'handoverConfirmedBySeller',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'listingId', 'listingTitle', 'listingCategory', 'listingUnit', 'listingLocation',
+          'sellerId', 'sellerUid', 'sellerName', 'buyerId', 'buyerUid', 'buyerName',
+          'requestedQuantity', 'intendedUse', 'preferredDate', 'preferredTime', 'arrangement',
+          'notes', 'status', 'handoverConfirmedByBuyer', 'handoverConfirmedBySeller',
+          'sellerWhatsapp', 'buyerWhatsapp', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == reqId
+        && isValidId(data.listingId)
+        && data.listingTitle is string && data.listingTitle.size() >= 1 && data.listingTitle.size() <= 120
+        && data.listingCategory is string && data.listingCategory.size() >= 1 && data.listingCategory.size() <= 80
+        && data.listingUnit is string && data.listingUnit.size() >= 1 && data.listingUnit.size() <= 24
+        && data.listingLocation is string && data.listingLocation.size() >= 1 && data.listingLocation.size() <= 120
+        && isValidId(data.sellerId)
+        && isValidId(data.sellerUid)
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120
+        && isValidId(data.buyerId)
+        && isValidId(data.buyerUid)
+        && data.buyerName is string && data.buyerName.size() >= 1 && data.buyerName.size() <= 120
+        && (data.requestedQuantity is number || data.requestedQuantity is int) && data.requestedQuantity > 0
+        && data.intendedUse is string && data.intendedUse.size() >= 3 && data.intendedUse.size() <= 300
+        && data.preferredDate is string && data.preferredDate.size() <= 40
+        && data.preferredTime is string && data.preferredTime.size() <= 40
+        && data.arrangement is string && data.arrangement in ['Pickup', 'Delivery Coordination']
+        && data.notes is string && data.notes.size() <= 600
+        && data.status is string && data.status in [
+          'Request Created', 'Accepted', 'Coordination In Progress',
+          'Pickup Scheduled', 'Collected', 'Completed', 'Declined', 'Cancelled'
+        ]
+        && data.handoverConfirmedByBuyer is bool
+        && data.handoverConfirmedBySeller is bool
+        && (!('sellerWhatsapp' in data) || data.sellerWhatsapp == null || (data.sellerWhatsapp is string && data.sellerWhatsapp.size() <= 24))
+        && (!('buyerWhatsapp' in data) || data.buyerWhatsapp == null || (data.buyerWhatsapp is string && data.buyerWhatsapp.size() <= 24))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFoodRequest(data, reqId) {
+      return data.keys().hasAll([
+          'id', 'donationId', 'donationTitle', 'donationLocation', 'pickupDeadline',
+          'donorId', 'donorUid', 'donorName', 'recipientId', 'recipientUid', 'recipientName',
+          'requestedPortions', 'preferredTime', 'notes', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'donationId', 'donationTitle', 'donationLocation', 'pickupDeadline',
+          'donorId', 'donorUid', 'donorName', 'recipientId', 'recipientUid', 'recipientName',
+          'requestedPortions', 'preferredTime', 'notes', 'status',
+          'donorWhatsapp', 'recipientWhatsapp', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == reqId
+        && isValidId(data.donationId)
+        && data.donationTitle is string && data.donationTitle.size() >= 1 && data.donationTitle.size() <= 120
+        && data.donationLocation is string && data.donationLocation.size() >= 1 && data.donationLocation.size() <= 120
+        && data.pickupDeadline is string && data.pickupDeadline.size() <= 64
+        && isValidId(data.donorId)
+        && isValidId(data.donorUid)
+        && data.donorName is string && data.donorName.size() >= 1 && data.donorName.size() <= 120
+        && isValidId(data.recipientId)
+        && isValidId(data.recipientUid)
+        && data.recipientName is string && data.recipientName.size() >= 1 && data.recipientName.size() <= 120
+        && data.requestedPortions is int && data.requestedPortions > 0
+        && data.preferredTime is string && data.preferredTime.size() <= 80
+        && data.notes is string && data.notes.size() <= 600
+        && data.status is string && data.status in [
+          'Request Received', 'Accepted', 'Coordination In Progress',
+          'Pickup Scheduled', 'Completed', 'Declined', 'Cancelled'
+        ]
+        && (!('donorWhatsapp' in data) || data.donorWhatsapp == null || (data.donorWhatsapp is string && data.donorWhatsapp.size() <= 24))
+        && (!('recipientWhatsapp' in data) || data.recipientWhatsapp == null || (data.recipientWhatsapp is string && data.recipientWhatsapp.size() <= 24))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOilEnquiry(data, enqId) {
+      return data.keys().hasAll([
+          'id', 'listingId', 'listingTitle', 'oilType', 'listingLocation',
+          'supplierId', 'supplierUid', 'supplierName', 'buyerId', 'buyerUid', 'buyerName',
+          'buyerOrganization', 'requestedLiters', 'intendedProcessing', 'preferredCollectionDate',
+          'notes', 'processingNotes', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'listingId', 'listingTitle', 'oilType', 'listingLocation',
+          'supplierId', 'supplierUid', 'supplierName', 'buyerId', 'buyerUid', 'buyerName',
+          'buyerOrganization', 'requestedLiters', 'intendedProcessing', 'preferredCollectionDate',
+          'notes', 'processingNotes', 'status', 'supplierWhatsapp', 'buyerWhatsapp',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == enqId
+        && isValidId(data.listingId)
+        && data.listingTitle is string && data.listingTitle.size() >= 1 && data.listingTitle.size() <= 120
+        && data.oilType is string && data.oilType.size() >= 1 && data.oilType.size() <= 80
+        && data.listingLocation is string && data.listingLocation.size() >= 1 && data.listingLocation.size() <= 120
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierUid)
+        && data.supplierName is string && data.supplierName.size() >= 1 && data.supplierName.size() <= 120
+        && isValidId(data.buyerId)
+        && isValidId(data.buyerUid)
+        && data.buyerName is string && data.buyerName.size() >= 1 && data.buyerName.size() <= 120
+        && data.buyerOrganization is string && data.buyerOrganization.size() <= 140
+        && (data.requestedLiters is number || data.requestedLiters is int) && data.requestedLiters > 0
+        && data.intendedProcessing is string && data.intendedProcessing.size() >= 3 && data.intendedProcessing.size() <= 200
+        && data.preferredCollectionDate is string && data.preferredCollectionDate.size() <= 40
+        && data.notes is string && data.notes.size() <= 500
+        && data.processingNotes is string && data.processingNotes.size() <= 500
+        && data.status is string && data.status in [
+          'Pending', 'Accepted', 'Scheduled', 'Collected', 'Completed', 'Declined', 'Cancelled'
+        ]
+        && (!('supplierWhatsapp' in data) || data.supplierWhatsapp == null || (data.supplierWhatsapp is string && data.supplierWhatsapp.size() <= 24))
+        && (!('buyerWhatsapp' in data) || data.buyerWhatsapp == null || (data.buyerWhatsapp is string && data.buyerWhatsapp.size() <= 24))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().lastLoginAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().lastLoginAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatarUrl', 'accountType', 'lastLoginAt']);
+      allow delete: if false;
+
+      match /saved/{savedId} {
+        allow get: if isValidId(userId) && isValidId(savedId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId)
+          && isValidId(savedId)
+          && isOwner(userId)
+          && isValidSavedItem(incoming(), savedId)
+          && incoming().createdAt == request.time;
+        allow delete: if isValidId(userId) && isValidId(savedId) && isOwner(userId);
+        allow update: if false;
+      }
+    }
+
+    match /material_listings/{listingId} {
+      allow get: if isValidId(listingId) && (
+        existing().isPublic == true
+        || (isSignedIn() && existing().sellerUid == request.auth.uid)
+        || isAdmin()
+      );
+      allow list: if resource.data.isPublic == true
+        || (isSignedIn() && resource.data.sellerUid == request.auth.uid)
+        || isAdmin();
+      allow create: if isValidId(listingId)
+        && isSignedIn()
+        && isValidMaterialListing(incoming(), listingId)
+        && incoming().sellerUid == request.auth.uid
+        && incoming().isHidden == false
+        && incoming().status == 'Active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(listingId)
+        && isSignedIn()
+        && isValidMaterialListing(incoming(), listingId)
+        && incoming().id == existing().id
+        && incoming().sellerId == existing().sellerId
+        && incoming().sellerUid == existing().sellerUid
+        && incoming().currency == existing().currency
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            existing().sellerUid == request.auth.uid
+            && !(existing().status in ['Completed', 'Cancelled'])
+            && incoming().isHidden == existing().isHidden
+            && incoming().sellerVerified == existing().sellerVerified
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'category', 'description', 'quantity', 'unit', 'condition', 'location',
+              'indicativePrice', 'imageUrl', 'availableUntil', 'pickupPreferences',
+              'reuseApplications', 'hasWhatsapp', 'completedByRequestId', 'status', 'isPublic',
+              'sellerName', 'sellerOrganization', 'updatedAt'
+            ])
+          )
+          || (
+            !(existing().status in ['Completed', 'Cancelled'])
+            && incoming().status == 'Completed'
+            && incoming().isPublic == false
+            && incoming().isHidden == existing().isHidden
+            && incoming().sellerVerified == existing().sellerVerified
+            && ('completedByRequestId' in incoming())
+            && isValidId(incoming().completedByRequestId)
+            && exists(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId))
+            && get(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId)).data.listingId == listingId
+            && get(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId)).data.buyerUid == request.auth.uid
+            && get(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId)).data.status == 'Completed'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'isPublic', 'completedByRequestId', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /food_donations/{donationId} {
+      allow get: if isValidId(donationId) && (
+        existing().isPublic == true
+        || (isSignedIn() && existing().donorUid == request.auth.uid)
+        || isAdmin()
+      );
+      allow list: if resource.data.isPublic == true
+        || (isSignedIn() && resource.data.donorUid == request.auth.uid)
+        || isAdmin();
+      allow create: if isValidId(donationId)
+        && isSignedIn()
+        && isValidFoodDonation(incoming(), donationId)
+        && incoming().donorUid == request.auth.uid
+        && incoming().isHidden == false
+        && incoming().status == 'Available'
+        && incoming().remainingPortions == incoming().portions
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(donationId)
+        && isSignedIn()
+        && isValidFoodDonation(incoming(), donationId)
+        && incoming().id == existing().id
+        && incoming().donorId == existing().donorId
+        && incoming().donorUid == existing().donorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            existing().donorUid == request.auth.uid
+            && !(existing().status in ['Completed', 'Cancelled', 'Expired'])
+            && incoming().isHidden == existing().isHidden
+            && incoming().donorVerified == existing().donorVerified
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'category', 'quantity', 'unit', 'portions',
+              'remainingPortions', 'preparedAt', 'availableUntil', 'pickupDeadline',
+              'storageInfo', 'packagingInfo', 'allergens', 'dietaryInfo', 'location',
+              'collectionInstructions', 'imageUrl', 'hasWhatsapp', 'completedByRequestId',
+              'status', 'isPublic', 'donorName', 'donorOrganization', 'updatedAt'
+            ])
+          )
+          || (
+            !(existing().status in ['Completed', 'Cancelled', 'Expired'])
+            && incoming().status == 'Completed'
+            && incoming().remainingPortions == 0
+            && incoming().isPublic == false
+            && incoming().isHidden == existing().isHidden
+            && incoming().donorVerified == existing().donorVerified
+            && ('completedByRequestId' in incoming())
+            && isValidId(incoming().completedByRequestId)
+            && exists(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId))
+            && get(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId)).data.donationId == donationId
+            && get(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId)).data.recipientUid == request.auth.uid
+            && get(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId)).data.status == 'Completed'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'remainingPortions', 'isPublic', 'completedByRequestId', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /oil_recovery_listings/{oilId} {
+      allow get: if isValidId(oilId) && (
+        existing().isPublic == true
+        || (isSignedIn() && existing().supplierUid == request.auth.uid)
+        || isAdmin()
+      );
+      allow list: if resource.data.isPublic == true
+        || (isSignedIn() && resource.data.supplierUid == request.auth.uid)
+        || isAdmin();
+      allow create: if isValidId(oilId)
+        && isSignedIn()
+        && isValidOilListing(incoming(), oilId)
+        && incoming().supplierUid == request.auth.uid
+        && incoming().isHidden == false
+        && incoming().collectionStatus == 'Available'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(oilId)
+        && isSignedIn()
+        && isValidOilListing(incoming(), oilId)
+        && incoming().id == existing().id
+        && incoming().supplierId == existing().supplierId
+        && incoming().supplierUid == existing().supplierUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            existing().supplierUid == request.auth.uid
+            && !(existing().collectionStatus in ['Processed', 'Cancelled'])
+            && incoming().isHidden == existing().isHidden
+            && incoming().supplierVerified == existing().supplierVerified
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'collectionStatus', 'isPublic', 'hasWhatsapp', 'completedByEnquiryId', 'updatedAt'
+            ])
+          )
+          || (
+            !(existing().collectionStatus in ['Processed', 'Cancelled'])
+            && incoming().collectionStatus == 'Processed'
+            && incoming().isPublic == false
+            && incoming().isHidden == existing().isHidden
+            && incoming().supplierVerified == existing().supplierVerified
+            && ('completedByEnquiryId' in incoming())
+            && isValidId(incoming().completedByEnquiryId)
+            && exists(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId))
+            && get(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId)).data.listingId == oilId
+            && get(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId)).data.buyerUid == request.auth.uid
+            && get(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId)).data.status == 'Completed'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'collectionStatus', 'isPublic', 'completedByEnquiryId', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /material_requests/{requestId} {
+      allow get: if isValidId(requestId) && isSignedIn() && (
+        existing().buyerUid == request.auth.uid
+        || existing().sellerUid == request.auth.uid
+        || isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        resource.data.buyerUid == request.auth.uid
+        || resource.data.sellerUid == request.auth.uid
+        || isAdmin()
+      );
+      allow create: if isValidId(requestId)
+        && isSignedIn()
+        && isValidMaterialRequest(incoming(), requestId)
+        && incoming().buyerUid == request.auth.uid
+        && incoming().buyerUid != incoming().sellerUid
+        && incoming().status == 'Request Created'
+        && incoming().handoverConfirmedByBuyer == false
+        && incoming().handoverConfirmedBySeller == false
+        && exists(/databases/$(database)/documents/material_listings/$(incoming().listingId))
+        && get(/databases/$(database)/documents/material_listings/$(incoming().listingId)).data.sellerUid == incoming().sellerUid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(requestId)
+        && isSignedIn()
+        && isValidMaterialRequest(incoming(), requestId)
+        && incoming().id == existing().id
+        && incoming().listingId == existing().listingId
+        && incoming().sellerId == existing().sellerId
+        && incoming().sellerUid == existing().sellerUid
+        && incoming().buyerId == existing().buyerId
+        && incoming().buyerUid == existing().buyerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            !(existing().status in ['Completed', 'Declined', 'Cancelled'])
+            && (
+              (
+                existing().sellerUid == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'preferredDate', 'preferredTime', 'notes',
+                  'handoverConfirmedBySeller', 'sellerWhatsapp', 'updatedAt'
+                ])
+              )
+              || (
+                existing().buyerUid == request.auth.uid
+                && incoming().status in ['Cancelled', 'Collected', 'Completed']
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'notes', 'handoverConfirmedByBuyer', 'buyerWhatsapp', 'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /food_requests/{requestId} {
+      allow get: if isValidId(requestId) && isSignedIn() && (
+        existing().recipientUid == request.auth.uid
+        || existing().donorUid == request.auth.uid
+        || isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        resource.data.recipientUid == request.auth.uid
+        || resource.data.donorUid == request.auth.uid
+        || isAdmin()
+      );
+      allow create: if isValidId(requestId)
+        && isSignedIn()
+        && isValidFoodRequest(incoming(), requestId)
+        && incoming().recipientUid == request.auth.uid
+        && incoming().recipientUid != incoming().donorUid
+        && incoming().status == 'Request Received'
+        && exists(/databases/$(database)/documents/food_donations/$(incoming().donationId))
+        && get(/databases/$(database)/documents/food_donations/$(incoming().donationId)).data.donorUid == incoming().donorUid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(requestId)
+        && isSignedIn()
+        && isValidFoodRequest(incoming(), requestId)
+        && incoming().id == existing().id
+        && incoming().donationId == existing().donationId
+        && incoming().donorId == existing().donorId
+        && incoming().donorUid == existing().donorUid
+        && incoming().recipientId == existing().recipientId
+        && incoming().recipientUid == existing().recipientUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            !(existing().status in ['Completed', 'Declined', 'Cancelled'])
+            && (
+              (
+                existing().donorUid == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'preferredTime', 'notes', 'donorWhatsapp', 'updatedAt'
+                ])
+              )
+              || (
+                existing().recipientUid == request.auth.uid
+                && incoming().status in ['Cancelled', 'Completed']
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'notes', 'recipientWhatsapp', 'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /oil_buyer_enquiries/{enquiryId} {
+      allow get: if isValidId(enquiryId) && isSignedIn() && (
+        existing().buyerUid == request.auth.uid
+        || existing().supplierUid == request.auth.uid
+        || isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        resource.data.buyerUid == request.auth.uid
+        || resource.data.supplierUid == request.auth.uid
+        || isAdmin()
+      );
+      allow create: if isValidId(enquiryId)
+        && isSignedIn()
+        && isValidOilEnquiry(incoming(), enquiryId)
+        && incoming().buyerUid == request.auth.uid
+        && incoming().buyerUid != incoming().supplierUid
+        && incoming().status == 'Pending'
+        && exists(/databases/$(database)/documents/oil_recovery_listings/$(incoming().listingId))
+        && get(/databases/$(database)/documents/oil_recovery_listings/$(incoming().listingId)).data.supplierUid == incoming().supplierUid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(enquiryId)
+        && isSignedIn()
+        && isValidOilEnquiry(incoming(), enquiryId)
+        && incoming().id == existing().id
+        && incoming().listingId == existing().listingId
+        && incoming().supplierId == existing().supplierId
+        && incoming().supplierUid == existing().supplierUid
+        && incoming().buyerId == existing().buyerId
+        && incoming().buyerUid == existing().buyerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            !(existing().status in ['Completed', 'Declined', 'Cancelled'])
+            && (
+              (
+                existing().supplierUid == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'processingNotes', 'supplierWhatsapp', 'updatedAt'
+                ])
+              )
+              || (
+                existing().buyerUid == request.auth.uid
+                && incoming().status in ['Cancelled', 'Collected', 'Completed']
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'notes', 'processingNotes', 'buyerWhatsapp', 'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if false;
+    }
+  }
+}

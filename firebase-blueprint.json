@@ -1,0 +1,350 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated VERDORA Google user profile stored by Firebase UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication user UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name from verified Google identity.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email address.",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "Google profile picture URL when provided.",
+          "maxLength": 500
+        },
+        "accountType": {
+          "type": "string",
+          "description": "Circular economy participation category (customer roles only).",
+          "enum": [
+            "general_user",
+            "buyer",
+            "material_buyer",
+            "material_supplier",
+            "restaurant_donor",
+            "food_recipient",
+            "industrial_buyer",
+            "oil_collection_partner",
+            "recycling_processor"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was created."
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest Google login."
+        }
+      },
+      "required": ["uid", "name", "email", "accountType", "createdAt", "lastLoginAt"]
+    },
+    "SavedItem": {
+      "title": "SavedItem",
+      "description": "Private user bookmark referencing a material listing or food donation.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "itemType": {
+          "type": "string",
+          "enum": ["material", "food"]
+        },
+        "itemId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "userUid", "itemType", "itemId", "createdAt"]
+    },
+    "MaterialListing": {
+      "title": "MaterialListing",
+      "description": "Publicly discoverable circular material listing synchronized across devices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "sellerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "sellerOrganization": { "type": "string", "maxLength": 140 },
+        "sellerVerified": { "type": "boolean" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 1500 },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "condition": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "location": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "indicativePrice": { "type": "number" },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "imageUrl": { "type": "string", "minLength": 1, "maxLength": 750000 },
+        "availableUntil": { "type": "string", "maxLength": 64 },
+        "pickupPreferences": { "type": "string", "maxLength": 300 },
+        "reuseApplications": { "type": "array" },
+        "hasWhatsapp": { "type": "boolean" },
+        "verificationId": { "type": "string", "maxLength": 128 },
+        "aiVerificationStatus": { "type": "string", "maxLength": 64 },
+        "completedByRequestId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "status": { "type": "string", "enum": ["Active", "Paused", "Unavailable", "Completed", "Cancelled"] },
+        "isHidden": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "sellerId", "sellerUid", "sellerName", "sellerOrganization", "sellerVerified",
+        "title", "category", "description", "quantity", "unit", "condition", "location",
+        "currency", "imageUrl", "availableUntil", "pickupPreferences", "reuseApplications",
+        "status", "isHidden", "isPublic", "createdAt", "updatedAt"
+      ]
+    },
+    "FoodDonation": {
+      "title": "FoodDonation",
+      "description": "Publicly discoverable surplus food donation synchronized across devices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "donorId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "donorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "donorName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "donorOrganization": { "type": "string", "maxLength": 140 },
+        "donorVerified": { "type": "boolean" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 1500 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "portions": { "type": "integer" },
+        "remainingPortions": { "type": "integer" },
+        "preparedAt": { "type": "string", "maxLength": 64 },
+        "availableUntil": { "type": "string", "maxLength": 64 },
+        "pickupDeadline": { "type": "string", "maxLength": 64 },
+        "storageInfo": { "type": "string", "maxLength": 300 },
+        "packagingInfo": { "type": "string", "maxLength": 300 },
+        "allergens": { "type": "string", "maxLength": 300 },
+        "dietaryInfo": { "type": "string", "maxLength": 200 },
+        "location": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "collectionInstructions": { "type": "string", "maxLength": 400 },
+        "imageUrl": { "type": "string", "minLength": 1, "maxLength": 750000 },
+        "hasWhatsapp": { "type": "boolean" },
+        "verificationId": { "type": "string", "maxLength": 128 },
+        "aiVerificationStatus": { "type": "string", "maxLength": 64 },
+        "completedByRequestId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "status": { "type": "string", "enum": ["Available", "Request Received", "Accepted", "Coordination In Progress", "Pickup Scheduled", "Completed", "Cancelled", "Expired"] },
+        "isHidden": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "donorId", "donorUid", "donorName", "donorOrganization", "donorVerified",
+        "title", "description", "category", "quantity", "unit", "portions", "remainingPortions",
+        "availableUntil", "pickupDeadline", "storageInfo", "packagingInfo", "allergens",
+        "dietaryInfo", "location", "collectionInstructions", "imageUrl", "status",
+        "isHidden", "isPublic", "createdAt", "updatedAt"
+      ]
+    },
+    "OilRecoveryListing": {
+      "title": "OilRecoveryListing",
+      "description": "Publicly discoverable used cooking oil lot synchronized across devices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "supplierUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "supplierOrganization": { "type": "string", "maxLength": 140 },
+        "supplierVerified": { "type": "boolean" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "oilType": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "volumeLiters": { "type": "number" },
+        "qualityGrade": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "containerType": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "filtrationStatus": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "pickupWindow": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "location": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "collectionStatus": { "type": "string", "enum": ["Available", "Enquiry Pending", "Scheduled", "Collected", "Processed", "Paused", "Cancelled"] },
+        "hasWhatsapp": { "type": "boolean" },
+        "verificationId": { "type": "string", "maxLength": 128 },
+        "aiVerificationStatus": { "type": "string", "maxLength": 64 },
+        "completedByEnquiryId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "isHidden": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "supplierId", "supplierUid", "supplierName", "supplierOrganization", "supplierVerified",
+        "title", "oilType", "volumeLiters", "qualityGrade", "containerType", "filtrationStatus",
+        "pickupWindow", "location", "collectionStatus", "isHidden", "isPublic", "createdAt", "updatedAt"
+      ]
+    },
+    "MaterialRequest": {
+      "title": "MaterialRequest",
+      "description": "Buyer pickup request coordinated across devices between buyer and seller.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "listingId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "listingTitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "listingCategory": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "listingUnit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "listingLocation": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "sellerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "sellerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "buyerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "buyerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "buyerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "requestedQuantity": { "type": "number" },
+        "intendedUse": { "type": "string", "minLength": 3, "maxLength": 300 },
+        "preferredDate": { "type": "string", "maxLength": 40 },
+        "preferredTime": { "type": "string", "maxLength": 40 },
+        "arrangement": { "type": "string", "enum": ["Pickup", "Delivery Coordination"] },
+        "notes": { "type": "string", "maxLength": 600 },
+        "status": { "type": "string", "enum": ["Request Created", "Accepted", "Coordination In Progress", "Pickup Scheduled", "Collected", "Completed", "Declined", "Cancelled"] },
+        "handoverConfirmedByBuyer": { "type": "boolean" },
+        "handoverConfirmedBySeller": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "listingId", "listingTitle", "listingCategory", "listingUnit", "listingLocation",
+        "sellerId", "sellerUid", "sellerName", "buyerId", "buyerUid", "buyerName",
+        "requestedQuantity", "intendedUse", "preferredDate", "preferredTime", "arrangement",
+        "notes", "status", "handoverConfirmedByBuyer", "handoverConfirmedBySeller", "createdAt", "updatedAt"
+      ]
+    },
+    "FoodRequest": {
+      "title": "FoodRequest",
+      "description": "Recipient food pickup request coordinated across devices between recipient and donor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "donationId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "donationTitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "donationLocation": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "pickupDeadline": { "type": "string", "maxLength": 64 },
+        "donorId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "donorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "donorName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "recipientId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "recipientUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "requestedPortions": { "type": "integer" },
+        "preferredTime": { "type": "string", "maxLength": 80 },
+        "notes": { "type": "string", "maxLength": 600 },
+        "status": { "type": "string", "enum": ["Request Received", "Accepted", "Coordination In Progress", "Pickup Scheduled", "Completed", "Declined", "Cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "donationId", "donationTitle", "donationLocation", "pickupDeadline",
+        "donorId", "donorUid", "donorName", "recipientId", "recipientUid", "recipientName",
+        "requestedPortions", "preferredTime", "notes", "status", "createdAt", "updatedAt"
+      ]
+    },
+    "OilBuyerEnquiry": {
+      "title": "OilBuyerEnquiry",
+      "description": "Industrial buyer enquiry coordinated across devices with oil supplier.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "listingId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "listingTitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "oilType": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "listingLocation": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "supplierUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "buyerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "buyerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "buyerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "buyerOrganization": { "type": "string", "maxLength": 140 },
+        "requestedLiters": { "type": "number" },
+        "intendedProcessing": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "preferredCollectionDate": { "type": "string", "maxLength": 40 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "processingNotes": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["Pending", "Accepted", "Scheduled", "Collected", "Completed", "Declined", "Cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "listingId", "listingTitle", "oilType", "listingLocation",
+        "supplierId", "supplierUid", "supplierName", "buyerId", "buyerUid", "buyerName",
+        "buyerOrganization", "requestedLiters", "intendedProcessing", "preferredCollectionDate",
+        "notes", "processingNotes", "status", "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private authenticated user profiles indexed by Firebase UID."
+    },
+    "/users/{userId}/saved/{savedId}": {
+      "schema": { "$ref": "#/entities/SavedItem" },
+      "description": "Private saved bookmarks for each user."
+    },
+    "/material_listings/{listingId}": {
+      "schema": { "$ref": "#/entities/MaterialListing" },
+      "description": "Shared circular material marketplace listings across all devices."
+    },
+    "/food_donations/{donationId}": {
+      "schema": { "$ref": "#/entities/FoodDonation" },
+      "description": "Shared surplus food rescue donations across all devices."
+    },
+    "/oil_recovery_listings/{oilId}": {
+      "schema": { "$ref": "#/entities/OilRecoveryListing" },
+      "description": "Shared used cooking oil recovery lots across all devices."
+    },
+    "/material_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/MaterialRequest" },
+      "description": "Participant-scoped material pickup coordination requests."
+    },
+    "/food_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/FoodRequest" },
+      "description": "Participant-scoped food collection requests."
+    },
+    "/oil_buyer_enquiries/{enquiryId}": {
+      "schema": { "$ref": "#/entities/OilBuyerEnquiry" },
+      "description": "Participant-scoped used cooking oil buyer enquiries."
+    }
+  }
+}
