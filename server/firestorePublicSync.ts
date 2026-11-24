@@ -181,8 +181,6 @@ export async function fetchPublicMaterialsFromFirestore(): Promise<MappedMateria
       status: String(d.status || 'Active'),
       isHidden: Boolean(d.isHidden),
       hiddenReason: null,
-      verificationId: typeof d.verificationId === 'string' ? d.verificationId : null,
-      aiVerificationStatus: typeof d.aiVerificationStatus === 'string' ? d.aiVerificationStatus : null,
       isDemo: false,
       createdAt: String(d.createdAt || new Date().toISOString()),
       updatedAt: String(d.updatedAt || d.createdAt || new Date().toISOString()),
@@ -227,8 +225,6 @@ export async function fetchPublicFoodDonationsFromFirestore(): Promise<MappedFoo
         status: isExpiredNow ? 'Expired' : rawStatus,
         isHidden: Boolean(d.isHidden),
         hiddenReason: null,
-        verificationId: typeof d.verificationId === 'string' ? d.verificationId : null,
-        aiVerificationStatus: typeof d.aiVerificationStatus === 'string' ? d.aiVerificationStatus : null,
         isDemo: false,
         createdAt: String(d.createdAt || new Date().toISOString()),
         updatedAt: String(d.updatedAt || d.createdAt || new Date().toISOString()),
@@ -259,24 +255,9 @@ export async function fetchPublicOilListingsFromFirestore(): Promise<MappedOil[]
       whatsappNumber: null,
       isHidden: Boolean(d.isHidden),
       hiddenReason: null,
-      verificationId: typeof d.verificationId === 'string' ? d.verificationId : null,
-      aiVerificationStatus: typeof d.aiVerificationStatus === 'string' ? d.aiVerificationStatus : null,
       createdAt: String(d.createdAt || new Date().toISOString()),
       updatedAt: String(d.updatedAt || d.createdAt || new Date().toISOString()),
     }));
-}
-
-function isTerminalItem(item: unknown): boolean {
-  if (!item || typeof item !== 'object') return false;
-  const obj = item as Record<string, unknown>;
-  const status = typeof obj.status === 'string' ? obj.status : '';
-  const collectionStatus = typeof obj.collectionStatus === 'string' ? obj.collectionStatus : '';
-  return (
-    status === 'Completed' ||
-    status === 'Cancelled' ||
-    collectionStatus === 'Processed' ||
-    collectionStatus === 'Cancelled'
-  );
 }
 
 export function mergeWithRemoteById<T extends { id: string; updatedAt: string; whatsappNumber: string | null }>(
@@ -291,19 +272,6 @@ export function mergeWithRemoteById<T extends { id: string; updatedAt: string; w
     const remote = byId.get(local.id);
     if (!remote) {
       byId.set(local.id, local);
-      continue;
-    }
-    const localTerminal = isTerminalItem(local);
-    const remoteTerminal = isTerminalItem(remote);
-    if (localTerminal && !remoteTerminal) {
-      byId.set(local.id, local);
-      continue;
-    }
-    if (remoteTerminal && !localTerminal) {
-      byId.set(local.id, {
-        ...remote,
-        whatsappNumber: remote.whatsappNumber ?? local.whatsappNumber,
-      });
       continue;
     }
     const localTime = new Date(local.updatedAt).getTime() || 0;

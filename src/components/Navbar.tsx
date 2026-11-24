@@ -1,4 +1,4 @@
-import { Menu, ShieldCheck, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import type { AppTab, User } from '../types';
 
@@ -72,43 +72,27 @@ export function Navbar({
         {/* Zone 3: Single primary action / account trigger */}
         <div className="flex items-center gap-3 shrink-0">
           {user ? (
-            <>
-              {user.role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => handleNav('admin')}
-                  className={`hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-ring ${
-                    activeTab === 'admin'
-                      ? 'border-[#93C9A3]/60 bg-[#1B3A2C] text-[#93C9A3]'
-                      : 'border-[#A9B78D]/25 bg-[#111C17] text-[#D2DDD6] hover:border-[#93C9A3]/40 hover:text-[#F4F7F4]'
-                  }`}
-                >
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#93C9A3]" />
-                  <span>Admin</span>
-                </button>
+            <button
+              type="button"
+              onClick={() => handleNav('workspace')}
+              className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#348F68] whitespace-nowrap shrink-0 cursor-pointer focus-ring"
+            >
+              {user.avatarUrl && (
+                <img
+                  src={user.avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                  className="h-4 w-4 rounded-full object-cover"
+                />
               )}
-              <button
-                type="button"
-                onClick={() => handleNav('workspace')}
-                className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#348F68] whitespace-nowrap shrink-0 cursor-pointer focus-ring"
-              >
-                {user.avatarUrl && (
-                  <img
-                    src={user.avatarUrl}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                    className="h-4 w-4 rounded-full object-cover"
-                  />
-                )}
-                <span>{user.name.split(' ')[0]}</span>
-                {unreadNotifications > 0 && (
-                  <span className="font-mono-tabular text-[11px] opacity-90">({unreadNotifications})</span>
-                )}
-              </button>
-            </>
+              <span>{user.name.split(' ')[0]}</span>
+              {unreadNotifications > 0 && (
+                <span className="font-mono-tabular text-[11px] opacity-90">({unreadNotifications})</span>
+              )}
+            </button>
           ) : (
             <button
               type="button"
@@ -153,25 +137,13 @@ export function Navbar({
             })}
             <div className="mt-3 border-t border-[#A9B78D]/15 pt-3">
               {user ? (
-                <div className="space-y-2">
-                  {user.role === 'admin' && (
-                    <button
-                      type="button"
-                      onClick={() => handleNav('admin')}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#93C9A3]/35 bg-[#14241D] px-4 py-2.5 text-sm font-semibold text-[#93C9A3] hover:bg-[#1B3328] cursor-pointer"
-                    >
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Admin Portal</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleNav('workspace')}
-                    className="w-full rounded-lg bg-[#2B7A58] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#348F68] cursor-pointer"
-                  >
-                    Open Workspace ({user.name.split(' ')[0]})
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleNav('workspace')}
+                  className="w-full rounded-lg bg-[#2B7A58] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#348F68] cursor-pointer"
+                >
+                  Open Workspace ({user.name.split(' ')[0]})
+                </button>
               ) : (
                 <button
                   type="button"

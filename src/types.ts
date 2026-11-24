@@ -126,8 +126,6 @@ export interface MaterialListing {
   reuseApplications: string[];
   whatsappNumber: string | null;
   status: MaterialStatus;
-  verificationId?: string | null;
-  aiVerificationStatus?: string | null;
   isHidden?: boolean;
   hiddenReason?: string | null;
   isDemo: boolean;
@@ -190,8 +188,6 @@ export interface FoodDonation {
   imageUrl: string;
   whatsappNumber: string | null;
   status: FoodDonationStatus;
-  verificationId?: string | null;
-  aiVerificationStatus?: string | null;
   isHidden?: boolean;
   hiddenReason?: string | null;
   isDemo: boolean;
@@ -238,8 +234,6 @@ export interface OilRecoveryListing {
   pickupWindow: string;
   location: string;
   collectionStatus: OilCollectionStatus;
-  verificationId?: string | null;
-  aiVerificationStatus?: string | null;
   whatsappNumber: string | null;
   isHidden?: boolean;
   hiddenReason?: string | null;
@@ -504,62 +498,14 @@ export interface ImpactSummary {
   };
 }
 
-export interface PersonalImpactSummary {
+export interface LeaderboardEntry {
+  userId: string;
+  displayName: string;
+  organization: string;
   points: number;
   completedHandovers: number;
   achievements: string[];
-}
-
-export type ListingKind = 'material' | 'food' | 'oil';
-
-export type AIVerificationStatus = 'VERIFIED' | 'NEEDS_REVIEW' | 'HIGH_RISK';
-
-export interface VerificationCheckItem {
-  area:
-    | 'description'
-    | 'duplicates'
-    | 'image'
-    | 'consistency'
-    | 'pricing'
-    | 'evidence'
-    | 'safety';
-  label: string;
-  status: 'pass' | 'warning' | 'fail';
-  explanation: string;
-}
-
-export interface DuplicateMatch {
-  id: string;
-  title: string;
-  location: string;
-  reason: string;
-  similarityScore: number;
-}
-
-export interface ListingVerificationRecord {
-  id: string;
-  userId: string;
-  userName?: string;
-  userEmail?: string;
-  listingType: ListingKind;
-  status: AIVerificationStatus;
-  humanReviewStatus: 'none' | 'pending' | 'approved' | 'rejected';
-  humanReviewNotes: string | null;
-  riskScore: number;
-  summary: string;
-  reasons: string[];
-  actionRequired: string | null;
-  checks: VerificationCheckItem[];
-  duplicateMatches: DuplicateMatch[];
-  evidenceNotes: string;
-  hasEvidenceImage: boolean;
-  canPublish: boolean;
-  publishedListingId: string | null;
-  payload: Record<string, unknown>;
-  disclaimer: string;
-  createdAt: string;
-  updatedAt: string;
-  expiresAt: string;
+  verified: boolean;
 }
 
 export interface MaterialScanResult {

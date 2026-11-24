@@ -7,10 +7,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AILabView } from './components/AILabView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { AuthModal } from './components/AuthModal';
-import { FoodRescueView } from './components/FoodRescueView';
+import { FoodRescueView, type FoodDraftPrefill } from './components/FoodRescueView';
 import { HomePage } from './components/HomePage';
 import { ImpactRewardsView } from './components/ImpactRewardsView';
-import { MarketplaceView } from './components/MarketplaceView';
+import { MarketplaceView, type MaterialDraftPrefill } from './components/MarketplaceView';
 import { Navbar } from './components/Navbar';
 import { OilRecoveryView } from './components/OilRecoveryView';
 import { WorkspaceView } from './components/WorkspaceView';
@@ -30,51 +30,14 @@ import type {
   Category,
   FoodDonation,
   ImpactSummary,
-  ListingKind,
   MaterialListing,
   OilRecoveryListing,
   User,
 } from './types';
 
-const TAB_TO_PATH: Record<AppTab, string> = {
-  home: '/',
-  marketplace: '/marketplace',
-  'food-rescue': '/food-rescue',
-  'oil-recovery': '/oil-recovery',
-  'ai-lab': '/ai-lab',
-  impact: '/impact',
-  workspace: '/workspace',
-  admin: '/admin',
-};
-
-function pathToTab(pathname: string): AppTab {
-  const clean = pathname.replace(/\/+$/, '').toLowerCase() || '/';
-  switch (clean) {
-    case '/marketplace':
-      return 'marketplace';
-    case '/food-rescue':
-      return 'food-rescue';
-    case '/oil-recovery':
-      return 'oil-recovery';
-    case '/ai-lab':
-      return 'ai-lab';
-    case '/impact':
-      return 'impact';
-    case '/workspace':
-      return 'workspace';
-    case '/admin':
-      return 'admin';
-    default:
-      return 'home';
-  }
-}
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<AppTab>(() =>
-    typeof window !== 'undefined' ? pathToTab(window.location.pathname) : 'home'
-  );
+  const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [aiSection, setAiSection] = useState<string>('scanner');
-  const [aiVerifyType, setAiVerifyType] = useState<ListingKind>('material');
   const [user, setUser] = useState<User | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [materials, setMaterials] = useState<MaterialListing[]>([]);
@@ -88,6 +51,8 @@ export default function App() {
 
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialListing | null>(null);
   const [selectedDonation, setSelectedDonation] = useState<FoodDonation | null>(null);
+  const [draftPrefill, setDraftPrefill] = useState<MaterialDraftPrefill | null>(null);
+  const [foodDraftPrefill, setFoodDraftPrefill] = useState<FoodDraftPrefill | null>(null);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -98,7 +63,6 @@ export default function App() {
   const authModalOpenRef = useRef(false);
   const restoringFirebaseRef = useRef(false);
   const backfilledUidRef = useRef<string | null>(null);
-  const promptedDirectRouteRef = useRef(false);
 
   const sqliteMaterialsRef = useRef<MaterialListing[]>([]);
   const fsMaterialsRef = useRef<MaterialListing[]>([]);
@@ -118,27 +82,6 @@ export default function App() {
   useEffect(() => {
     authModalOpenRef.current = authModalOpen;
   }, [authModalOpen]);
-
-  const syncBrowserPath = useCallback((tab: AppTab, replace = false) => {
-    if (typeof window === 'undefined') return;
-    const targetPath = TAB_TO_PATH[tab] || '/';
-    if (window.location.pathname !== targetPath) {
-      if (replace) {
-        window.history.replaceState({ tab }, '', targetPath);
-      } else {
-        window.history.pushState({ tab }, '', targetPath);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const onPopState = () => {
-      const next = pathToTab(window.location.pathname);
-      setActiveTab(next);
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -282,15 +225,6 @@ export default function App() {
   }, [loadAll]);
 
   useEffect(() => {
-    if (!authChecked || user || promptedDirectRouteRef.current) return;
-    if (activeTab === 'admin' || activeTab === 'workspace') {
-      promptedDirectRouteRef.current = true;
-      setPendingTabAfterAuth(activeTab);
-      setAuthModalOpen(true);
-    }
-  }, [authChecked, user, activeTab]);
-
-  useEffect(() => {
     const unsubscribe = subscribePublicCatalogFromFirestore({
       onMaterials: (items) => {
         fsMaterialsRef.current = items;
@@ -347,18 +281,9 @@ export default function App() {
       return;
     }
     setActiveTab(tab);
-    syncBrowserPath(tab);
-    if (tab === 'ai-lab') {
-      setAiSection(subSection || 'scanner');
+    if (tab === 'ai-lab' && subSection) {
+      setAiSection(subSection);
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleGoToAIVerifier = (kind: ListingKind) => {
-    setAiVerifyType(kind);
-    setAiSection('verify');
-    setActiveTab('ai-lab');
-    syncBrowserPath('ai-lab');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -391,12 +316,13 @@ export default function App() {
             listings={materials}
             savedIds={savedIds}
             selectedListing={selectedMaterial}
+            draftPrefill={draftPrefill}
+            onClearDraftPrefill={() => setDraftPrefill(null)}
             onSelectListing={setSelectedMaterial}
             onRefresh={loadAll}
             onRequireAuth={() => setAuthModalOpen(true)}
             onToast={showToast}
             onOpenOilRecovery={() => handleNavigate('oil-recovery')}
-            onGoToAIVerifier={handleGoToAIVerifier}
           />
         )}
 
@@ -407,7 +333,6 @@ export default function App() {
             onRefresh={loadAll}
             onRequireAuth={() => setAuthModalOpen(true)}
             onToast={showToast}
-            onGoToAIVerifier={handleGoToAIVerifier}
           />
         )}
 
@@ -417,44 +342,39 @@ export default function App() {
             categories={categories}
             donations={donations}
             selectedDonation={selectedDonation}
+            draftPrefill={foodDraftPrefill}
+            onClearDraftPrefill={() => setFoodDraftPrefill(null)}
             onSelectDonation={setSelectedDonation}
             onRefresh={loadAll}
             onRequireAuth={() => setAuthModalOpen(true)}
             onToast={showToast}
-            onGoToAIVerifier={handleGoToAIVerifier}
           />
         )}
 
         {activeTab === 'ai-lab' && (
           <AILabView
-            key={`${aiSection}-${aiVerifyType}`}
+            key={aiSection}
             initialSection={aiSection}
-            initialVerifyType={aiVerifyType}
-            user={user}
             categories={categories}
             listings={materials}
             donations={donations}
-            onRequireAuth={() => setAuthModalOpen(true)}
-            onPublished={async (kind, item) => {
-              await loadAll();
-              if (kind === 'material') {
-                setSelectedMaterial(item as MaterialListing);
-                handleNavigate('marketplace');
-              } else if (kind === 'food') {
-                setSelectedDonation(item as FoodDonation);
-                handleNavigate('food-rescue');
-              } else {
-                handleNavigate('oil-recovery');
-              }
+            onCreateListingFromScan={(draft) => {
+              setDraftPrefill(draft);
+              setActiveTab('marketplace');
+              if (!user) setAuthModalOpen(true);
             }}
-            onToast={showToast}
+            onCreateFoodDonationFromAI={(draft) => {
+              setFoodDraftPrefill(draft);
+              setActiveTab('food-rescue');
+              if (!user) setAuthModalOpen(true);
+            }}
             onInspectListing={(item) => {
               setSelectedMaterial(item);
-              handleNavigate('marketplace');
+              setActiveTab('marketplace');
             }}
             onInspectDonation={(item) => {
               setSelectedDonation(item);
-              handleNavigate('food-rescue');
+              setActiveTab('food-rescue');
             }}
           />
         )}
@@ -476,7 +396,6 @@ export default function App() {
               if (!u) {
                 await signOutFirebase();
                 setActiveTab('home');
-                syncBrowserPath('home', true);
               }
               await loadAll();
             }}
@@ -507,17 +426,14 @@ export default function App() {
         onSuccess={async (loggedInUser) => {
           setUser(loggedInUser);
           if (pendingTabAfterAuth) {
-            const target =
-              pendingTabAfterAuth === 'admin' && loggedInUser.role !== 'admin'
-                ? 'workspace'
-                : pendingTabAfterAuth;
-            setActiveTab(target);
-            syncBrowserPath(target);
+            if (pendingTabAfterAuth === 'admin' && loggedInUser.role !== 'admin') {
+              setActiveTab('workspace');
+            } else {
+              setActiveTab(pendingTabAfterAuth);
+            }
             setPendingTabAfterAuth(null);
           } else if (activeTab === 'home') {
-            const target = loggedInUser.role === 'admin' ? 'admin' : 'workspace';
-            setActiveTab(target);
-            syncBrowserPath(target);
+            setActiveTab(loggedInUser.role === 'admin' ? 'admin' : 'workspace');
           }
           showToast(`Signed in as ${loggedInUser.name}.`);
           await loadAll();

@@ -36,7 +36,6 @@ import type {
   Category,
   FoodDonation,
   ImpactSummary,
-  ListingVerificationRecord,
   MaterialListing,
   OilRecoveryListing,
   ReportRecord,
@@ -54,7 +53,6 @@ export type AdminSection =
   | 'orders'
   | 'food-rescue'
   | 'oil-recovery'
-  | 'ai-verifications'
   | 'verifications'
   | 'reports-impact'
   | 'audit-logs'
@@ -87,7 +85,6 @@ const SIDEBAR_ITEMS: Array<{ id: AdminSection; label: string; icon: typeof Layou
   { id: 'orders', label: 'Orders', icon: ClipboardList },
   { id: 'food-rescue', label: 'Food Rescue', icon: Utensils },
   { id: 'oil-recovery', label: 'Oil Recovery', icon: Droplets },
-  { id: 'ai-verifications', label: 'AI Listing Reviews', icon: ShieldCheck },
   { id: 'verifications', label: 'Business Verification', icon: UserCheck },
   { id: 'reports-impact', label: 'Reports & Impact', icon: BarChart3 },
   { id: 'audit-logs', label: 'Admin Audit Logs', icon: FileText },
@@ -164,13 +161,8 @@ export function AdminDashboardView({
   const [oilEnquiries, setOilEnquiries] = useState<Awaited<ReturnType<typeof api.adminGetOilRecovery>>['enquiries']>([]);
   const [loadingOil, setLoadingOil] = useState(false);
 
-  // Verifications, AI Listing Reviews, Reports, Audit Logs, Settings
+  // Verifications, Reports, Audit Logs, Settings
   const [verifications, setVerifications] = useState<VerificationSubmission[]>([]);
-  const [aiVerifications, setAiVerifications] = useState<ListingVerificationRecord[]>([]);
-  const [aiVerStatusFilter, setAiVerStatusFilter] = useState('All');
-  const [aiVerReviewFilter, setAiVerReviewFilter] = useState('All');
-  const [aiVerQ, setAiVerQ] = useState('');
-  const [loadingAiVer, setLoadingAiVer] = useState(false);
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditQ, setAuditQ] = useState('');
@@ -288,22 +280,6 @@ export function AdminDashboardView({
     }
   }, []);
 
-  const loadAiVerifications = useCallback(async () => {
-    setLoadingAiVer(true);
-    try {
-      const res = await api.adminGetAiVerifications({
-        status: aiVerStatusFilter,
-        review: aiVerReviewFilter,
-        q: aiVerQ,
-      });
-      setAiVerifications(res.verifications);
-    } catch (err) {
-      setErrorBanner(err instanceof Error ? err.message : 'Unable to load AI listing verifications.');
-    } finally {
-      setLoadingAiVer(false);
-    }
-  }, [aiVerStatusFilter, aiVerReviewFilter, aiVerQ]);
-
   const loadAuditLogs = useCallback(async () => {
     setLoadingAudit(true);
     try {
@@ -327,7 +303,6 @@ export function AdminDashboardView({
     if (section === 'orders') void loadOrders();
     if (section === 'food-rescue') void loadFoodRescue();
     if (section === 'oil-recovery') void loadOilRecovery();
-    if (section === 'ai-verifications') void loadAiVerifications();
     if (section === 'verifications' || section === 'reports-impact') void loadVerificationsAndReports();
     if (section === 'audit-logs') void loadAuditLogs();
   }, [
@@ -339,7 +314,6 @@ export function AdminDashboardView({
     loadOrders,
     loadFoodRescue,
     loadOilRecovery,
-    loadAiVerifications,
     loadVerificationsAndReports,
     loadAuditLogs,
   ]);
@@ -2095,205 +2069,6 @@ export function AdminDashboardView({
                           </div>
                         </div>
                       ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 9B. AI LISTING VERIFICATION REVIEWS */}
-              {section === 'ai-verifications' && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-6 space-y-4">
-                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                      <div>
-                        <h2 className="font-display text-2xl font-semibold text-[#F4F7F4]">
-                          AI Listing Verification Moderation Queue
-                        </h2>
-                        <p className="mt-1 text-xs text-[#C8D6CD]">
-                          Review AI authenticity checks, user-submitted supporting evidence, and approve or reject listings flagged for human moderation.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void loadAiVerifications()}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-2 text-xs font-semibold text-[#F4F7F4] hover:bg-[#21362D] self-start cursor-pointer"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        <span>Refresh</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#9BB0A3]" />
-                        <input
-                          type="text"
-                          value={aiVerQ}
-                          onChange={(e) => setAiVerQ(e.target.value)}
-                          placeholder="Search listing title, seller, or email..."
-                          className="w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] pl-9 pr-3 py-2 text-xs text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
-                        />
-                      </div>
-                      <select
-                        value={aiVerStatusFilter}
-                        onChange={(e) => setAiVerStatusFilter(e.target.value)}
-                        className="rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-xs text-[#F4F7F4] focus-ring"
-                      >
-                        <option value="All">All AI Statuses</option>
-                        <option value="NEEDS_REVIEW">NEEDS_REVIEW</option>
-                        <option value="HIGH_RISK">HIGH_RISK</option>
-                        <option value="VERIFIED">VERIFIED</option>
-                      </select>
-                      <select
-                        value={aiVerReviewFilter}
-                        onChange={(e) => setAiVerReviewFilter(e.target.value)}
-                        className="rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-xs text-[#F4F7F4] focus-ring"
-                      >
-                        <option value="All">All Human Review States</option>
-                        <option value="pending">Pending Human Review</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="none">Not Requested</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {loadingAiVer ? (
-                    <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-8 text-center text-xs text-[#C8D6CD]">
-                      Loading AI verification records...
-                    </div>
-                  ) : aiVerifications.length === 0 ? (
-                    <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-8 text-center text-xs text-[#9BB0A3]">
-                      No AI listing verification records match the current filter.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {aiVerifications.map((item) => {
-                        const title = String(item.payload?.title ?? 'Untitled Listing');
-                        const category = String(item.payload?.category ?? item.payload?.oilType ?? 'N/A');
-                        const statusColor =
-                          item.status === 'VERIFIED'
-                            ? 'text-[#7CE0A3]'
-                            : item.status === 'NEEDS_REVIEW'
-                              ? 'text-[#FAD089]'
-                              : 'text-[#FCA5A5]';
-                        const reviewLabel =
-                          item.humanReviewStatus === 'none'
-                            ? 'Not Requested'
-                            : item.humanReviewStatus.charAt(0).toUpperCase() + item.humanReviewStatus.slice(1);
-                        return (
-                          <div
-                            key={item.id}
-                            className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-5 space-y-3 text-xs"
-                          >
-                            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-display text-base font-semibold text-[#F4F7F4]">
-                                    {title}
-                                  </span>
-                                  <span className="rounded bg-[#172620] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#93C9A3]">
-                                    {item.listingType}
-                                  </span>
-                                  <span className={`font-semibold ${statusColor}`}>
-                                    AI: {item.status.replace('_', ' ')}
-                                  </span>
-                                  <span className="text-[#9BB0A3]">
-                                    · Human Review: <StatusText status={reviewLabel} />
-                                  </span>
-                                </div>
-                                <div className="mt-1 text-[#9BB0A3]">
-                                  Submitted by <strong className="text-[#D2DDD6]">{item.userName || 'User'}</strong>{' '}
-                                  {item.userEmail ? `(${item.userEmail})` : ''} · Category: {category} ·{' '}
-                                  Risk Score: <span className="font-mono-tabular text-[#F4F7F4]">{item.riskScore}/100</span> ·{' '}
-                                  {formatDateTime(item.createdAt)}
-                                </div>
-                              </div>
-                              {item.publishedListingId && (
-                                <span className="rounded border border-[#2B7A58]/40 bg-[#123324] px-2.5 py-1 text-[11px] font-semibold text-[#9BF0BC]">
-                                  Published
-                                </span>
-                              )}
-                            </div>
-
-                            <p className="text-[#D2DDD6] leading-relaxed">{item.summary}</p>
-
-                            {item.reasons.length > 0 && (
-                              <div className="rounded-xl border border-[#A9B78D]/15 bg-[#0D1612] p-3 space-y-1">
-                                <div className="font-semibold text-[#93C9A3]">Key Findings</div>
-                                <ul className="list-disc pl-4 space-y-1 text-[#D2DDD6]">
-                                  {item.reasons.map((r, i) => (
-                                    <li key={i}>{r}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {item.evidenceNotes && (
-                              <div className="rounded-xl border border-[#D9BA7E]/30 bg-[#251E10] p-3 text-[#F6DFB0]">
-                                <strong>Seller Supporting Evidence:</strong> {item.evidenceNotes}
-                              </div>
-                            )}
-
-                            {item.humanReviewNotes && (
-                              <div className="rounded-xl border border-[#A9B78D]/20 bg-[#172620] p-3 text-[#C8D6CD]">
-                                <strong>Admin Review Note:</strong> {item.humanReviewNotes}
-                              </div>
-                            )}
-
-                            {!item.publishedListingId && (
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    requestConfirmation({
-                                      title: 'Approve Listing for Publishing',
-                                      description: `Approve "${title}" after reviewing AI findings and supporting evidence so the owner can publish it.`,
-                                      confirmLabel: 'Approve Listing',
-                                      requireReason: false,
-                                      tone: 'primary',
-                                      onConfirm: async (reason) => {
-                                        await api.adminReviewAiVerification(item.id, {
-                                          decision: 'approved',
-                                          notes: reason || undefined,
-                                        });
-                                        onToast('Listing verification approved. Owner can now publish.');
-                                        await loadAiVerifications();
-                                      },
-                                    })
-                                  }
-                                  className="inline-flex items-center gap-1 rounded-lg bg-[#2B7A58] px-3 py-1.5 font-semibold text-white hover:bg-[#348F68] cursor-pointer"
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" /> Approve to Publish
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    requestConfirmation({
-                                      title: 'Reject Listing Verification',
-                                      description: `Reject "${title}" and keep it blocked from publishing. Provide a clear reason for the user.`,
-                                      confirmLabel: 'Reject Listing',
-                                      requireReason: true,
-                                      tone: 'danger',
-                                      onConfirm: async (reason) => {
-                                        await api.adminReviewAiVerification(item.id, {
-                                          decision: 'rejected',
-                                          notes: reason,
-                                        });
-                                        onToast('Listing verification rejected.');
-                                        await loadAiVerifications();
-                                      },
-                                    })
-                                  }
-                                  className="rounded-lg border border-[#E06C75]/35 bg-[#361619] px-3 py-1.5 font-semibold text-[#FFB3B8] hover:bg-[#4A1D21] cursor-pointer"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
                     </div>
                   )}
                 </div>

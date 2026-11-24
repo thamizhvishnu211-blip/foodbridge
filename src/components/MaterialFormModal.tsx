@@ -31,6 +31,11 @@ interface MaterialFormModalProps {
 }
 
 const CONDITIONS = ['Unused Surplus', 'Like New', 'Good', 'Fair / Needs Cleaning'];
+const IMAGE_PRESETS = [
+  { label: 'Aluminium / Metal', value: 'media:aluminium' },
+  { label: 'Timber / Pallets', value: 'media:wood' },
+  { label: 'Textiles / Linen', value: 'media:textile' },
+];
 
 export function MaterialFormModal({
   isOpen,
@@ -58,7 +63,7 @@ export function MaterialFormModal({
   const [pickupPreferences, setPickupPreferences] = useState('Weekday daytime loading bay pickup');
   const [reuseText, setReuseText] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [imageUrl, setImageUrl] = useState('none');
+  const [imageUrl, setImageUrl] = useState('media:aluminium');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -97,13 +102,13 @@ export function MaterialFormModal({
       setPickupPreferences('Weekday pickup preferred');
       setReuseText(draftPrefill?.reuseApplications?.join(', ') ?? '');
       setWhatsappNumber(user?.whatsappNumber ?? '');
-      setImageUrl(draftPrefill?.imageUrl ?? 'none');
+      setImageUrl(draftPrefill?.imageUrl ?? 'media:aluminium');
     }
     setFormError(null);
     setSubmitting(false);
   }, [isOpen, editingListing, draftPrefill, user?.id, materialCategories]);
 
-  if (!isOpen || !editingListing) return null;
+  if (!isOpen) return null;
 
   const hasCurrentCategory = materialCategories.some((c) => c.name === category);
   const hasCurrentCondition = CONDITIONS.includes(condition);
@@ -144,7 +149,7 @@ export function MaterialFormModal({
 
     setSubmitting(true);
     try {
-      const optimizedImageUrl = await compressImageDataUrlForFirestore(imageUrl, 'none');
+      const optimizedImageUrl = await compressImageDataUrlForFirestore(imageUrl, 'media:aluminium');
       const payload = {
         title: title.trim(),
         category,
@@ -165,7 +170,9 @@ export function MaterialFormModal({
       };
       let savedListing: MaterialListing;
       try {
-        const res = await api.updateMaterial(editingListing.id, payload);
+        const res = editingListing
+          ? await api.updateMaterial(editingListing.id, payload)
+          : await api.createMaterial(payload);
         savedListing = {
           ...res.listing,
           sellerUid: res.listing.sellerUid || auth.currentUser?.uid || user?.firebaseUid || undefined,
@@ -215,7 +222,7 @@ export function MaterialFormModal({
         </button>
 
         <h2 id="create-material-title" className="font-display text-2xl font-semibold text-[#F4F7F4]">
-          Edit Material Listing
+          {editingListing ? 'Edit Material Listing' : 'Publish Reusable Material'}
         </h2>
         <p className="mt-1 text-xs text-[#C8D6CD]">
           Provide accurate quantities, condition, and pickup preferences. No payment gateway is used.
@@ -396,20 +403,30 @@ export function MaterialFormModal({
           {/* Image Upload & Preview */}
           <div className="rounded-xl border border-[#A9B78D]/20 bg-[#172620] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-[#F4F7F4]">Listing Photo</span>
+              <span className="text-xs font-semibold text-[#F4F7F4]">Listing Image</span>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_PRESETS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setImageUrl(p.value)}
+                    className={`rounded-md px-2 py-1 text-[11px] font-medium cursor-pointer ${
+                      imageUrl === p.value
+                        ? 'bg-[#2B7A58] text-white'
+                        : 'bg-[#0D1612] text-[#C8D6CD] hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="mt-3 flex items-center gap-4">
-              {resolveImageSrc(imageUrl) ? (
-                <img
-                  src={resolveImageSrc(imageUrl)!}
-                  alt="Listing preview"
-                  className="h-20 w-28 rounded-lg object-cover border border-[#A9B78D]/20"
-                />
-              ) : (
-                <div className="flex h-20 w-28 items-center justify-center rounded-lg border border-dashed border-[#A9B78D]/25 bg-[#0D1612] text-[11px] text-[#9BB0A3]">
-                  No photo
-                </div>
-              )}
+              <img
+                src={resolveImageSrc(imageUrl, 'aluminium')}
+                alt="Listing preview"
+                className="h-20 w-28 rounded-lg object-cover border border-[#A9B78D]/20"
+              />
               <div className="flex flex-col gap-2">
                 <label className="inline-flex items-center gap-2 rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-1.5 text-xs font-semibold text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer">
                   <Upload className="h-3.5 w-3.5 text-[#93C9A3]" />
@@ -425,10 +442,10 @@ export function MaterialFormModal({
                     }}
                   />
                 </label>
-                {resolveImageSrc(imageUrl) && (
+                {imageUrl.startsWith('data:image/') && (
                   <button
                     type="button"
-                    onClick={() => setImageUrl('none')}
+                    onClick={() => setImageUrl('media:aluminium')}
                     className="text-left text-xs text-[#FCA5A5] hover:underline cursor-pointer"
                   >
                     Remove uploaded photo
@@ -451,7 +468,11 @@ export function MaterialFormModal({
               disabled={submitting}
               className="rounded-lg bg-[#2B7A58] px-5 py-2 text-xs font-semibold text-white hover:bg-[#348F68] disabled:opacity-60 cursor-pointer"
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+              {submitting
+                ? 'Saving...'
+                : editingListing
+                  ? 'Save Changes'
+                  : 'Publish Listing'}
             </button>
           </div>
         </form>

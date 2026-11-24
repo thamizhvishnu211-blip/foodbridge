@@ -8,7 +8,7 @@ import {
   Utensils,
   X,
 } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { resolveImageSrc } from '../data/media';
 import { auth } from '../firebase';
 import { api } from '../services/api';
@@ -17,23 +17,25 @@ import {
   createFoodRequestInFirestore,
   isOwnerOfResource,
 } from '../services/firestoreSync';
-import type { Category, FoodDonation, ListingKind, User } from '../types';
+import type { Category, FoodDonation, User } from '../types';
 import { buildWhatsAppUrl, formatDateTime, isExpiredDate } from '../utils/format';
-import { AIVerifyGateModal } from './AIVerifyGateModal';
 import { ConfirmDialog } from './ConfirmDialog';
-import { FoodDonationFormModal } from './FoodDonationFormModal';
+import { FoodDonationFormModal, type FoodDraftPrefill } from './FoodDonationFormModal';
 import { ReportModal } from './ReportModal';
+
+export type { FoodDraftPrefill };
 
 interface FoodRescueViewProps {
   user: User | null;
   categories: Category[];
   donations: FoodDonation[];
   selectedDonation: FoodDonation | null;
+  draftPrefill?: FoodDraftPrefill | null;
+  onClearDraftPrefill?: () => void;
   onSelectDonation: (d: FoodDonation | null) => void;
   onRefresh: () => Promise<void>;
   onRequireAuth: () => void;
   onToast: (msg: string) => void;
-  onGoToAIVerifier: (kind: ListingKind) => void;
 }
 
 export function FoodRescueView({
@@ -41,11 +43,12 @@ export function FoodRescueView({
   categories,
   donations,
   selectedDonation,
+  draftPrefill,
+  onClearDraftPrefill,
   onSelectDonation,
   onRefresh,
   onRequireAuth,
   onToast,
-  onGoToAIVerifier,
 }: FoodRescueViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -53,11 +56,18 @@ export function FoodRescueView({
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [sortBy, setSortBy] = useState<'deadline' | 'portions-desc' | 'newest'>('deadline');
 
-  const [showAIGateModal, setShowAIGateModal] = useState(false);
+  const [showDonateModal, setShowDonateModal] = useState(Boolean(draftPrefill));
   const [editingDonation, setEditingDonation] = useState<FoodDonation | null>(null);
   const [cancelTarget, setCancelTarget] = useState<FoodDonation | null>(null);
   const [showSafetyGuide, setShowSafetyGuide] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ type: 'material' | 'food'; id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (draftPrefill) {
+      setEditingDonation(null);
+      setShowDonateModal(true);
+    }
+  }, [draftPrefill]);
 
   // Recipient request state
   const [reqPortions, setReqPortions] = useState('10');
@@ -98,12 +108,13 @@ export function FoodRescueView({
     return out;
   }, [donations, searchQuery, categoryFilter, locationFilter, onlyAvailable, sortBy]);
 
-  const openEditDonationForm = (editTarget: FoodDonation) => {
+  const openDonationForm = (editTarget?: FoodDonation) => {
     if (!user) {
       onRequireAuth();
       return;
     }
-    setEditingDonation(editTarget);
+    setEditingDonation(editTarget ?? null);
+    setShowDonateModal(true);
   };
 
   const handleRequestFood = async (e: FormEvent) => {
@@ -188,11 +199,11 @@ export function FoodRescueView({
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => setShowAIGateModal(true)}
+                onClick={() => openDonationForm()}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer focus-ring"
               >
                 <Plus className="h-4 w-4" />
-                <span>Add to List</span>
+                <span>Donate Food</span>
               </button>
               <button
                 type="button"
@@ -322,25 +333,20 @@ export function FoodRescueView({
             {filtered.map((d) => {
               const expired = d.status === 'Expired' || isExpiredDate(d.pickupDeadline);
               const missingSafety = hasMissingSafetyInfo(d);
-              const imgSrc = resolveImageSrc(d.imageUrl);
               return (
                 <article
                   key={d.id}
-                  className={`grid grid-cols-1 overflow-hidden rounded-2xl border border-[#A9B78D]/20 bg-[#111C17] ${
-                    imgSrc ? 'sm:grid-cols-5' : ''
-                  }`}
+                  className="grid grid-cols-1 overflow-hidden rounded-2xl border border-[#A9B78D]/20 bg-[#111C17] sm:grid-cols-5"
                 >
-                  {imgSrc && (
-                    <div className="aspect-[4/3] sm:aspect-auto sm:col-span-2 bg-[#0D1612]">
-                      <img
-                        src={imgSrc}
-                        alt={d.title}
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className={`flex flex-col justify-between p-5 ${imgSrc ? 'sm:col-span-3' : ''}`}>
+                  <div className="aspect-[4/3] sm:aspect-auto sm:col-span-2 bg-[#0D1612]">
+                    <img
+                      src={resolveImageSrc(d.imageUrl, 'bakery')}
+                      alt={d.title}
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-between p-5 sm:col-span-3">
                     <div>
                       <div className="text-xs text-[#9BB0A3]">
                         {d.category} ·{' '}
@@ -424,16 +430,14 @@ export function FoodRescueView({
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
               <div className="md:col-span-5 space-y-4">
-                {resolveImageSrc(selectedDonation.imageUrl) && (
-                  <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[#0D1612]">
-                    <img
-                      src={resolveImageSrc(selectedDonation.imageUrl)!}
-                      alt={selectedDonation.title}
-                      referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                )}
+                <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[#0D1612]">
+                  <img
+                    src={resolveImageSrc(selectedDonation.imageUrl, 'bakery')}
+                    alt={selectedDonation.title}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
                 <div className="rounded-xl border border-[#A9B78D]/20 bg-[#172620] p-4 text-xs text-[#D2DDD6] space-y-2">
                   <div className="font-semibold text-[#93C9A3]">Handling & Safety Disclosures</div>
                   <div>
@@ -531,7 +535,7 @@ export function FoodRescueView({
                         onClick={() => {
                           const target = selectedDonation;
                           onSelectDonation(null);
-                          openEditDonationForm(target);
+                          openDonationForm(target);
                         }}
                         className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-2 text-xs font-semibold text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
                       >
@@ -637,23 +641,25 @@ export function FoodRescueView({
         </div>
       )}
 
-      {/* AI VERIFICATION GATE MODAL (NEW DONATIONS) */}
-      <AIVerifyGateModal
-        isOpen={showAIGateModal}
-        listingType="food"
-        onClose={() => setShowAIGateModal(false)}
-        onGoToAssistant={(kind) => onGoToAIVerifier(kind)}
-      />
-
-      {/* EDIT EXISTING FOOD DONATION MODAL ONLY */}
+      {/* DONATE / EDIT FOOD MODAL */}
       <FoodDonationFormModal
-        isOpen={Boolean(editingDonation)}
+        isOpen={showDonateModal}
         user={user}
         categories={categories}
         editingDonation={editingDonation}
-        onClose={() => setEditingDonation(null)}
-        onSaved={async () => {
-          onToast('Food donation updated.');
+        draftPrefill={draftPrefill}
+        onClose={() => {
+          setShowDonateModal(false);
+          setEditingDonation(null);
+          onClearDraftPrefill?.();
+        }}
+        onSaved={async (_donation, isEdit) => {
+          onToast(
+            isEdit
+              ? 'Food donation updated.'
+              : 'Food donation published to VERDORA Food Rescue.'
+          );
+          onClearDraftPrefill?.();
           await onRefresh();
         }}
       />

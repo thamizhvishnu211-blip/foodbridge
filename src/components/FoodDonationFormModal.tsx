@@ -32,6 +32,11 @@ interface FoodDonationFormModalProps {
   onSaved: (donation: FoodDonation, isEdit: boolean) => Promise<void> | void;
 }
 
+const FOOD_PRESETS = [
+  { label: 'Bakery Surplus', value: 'media:bakery' },
+  { label: 'Fresh Produce', value: 'media:produce' },
+];
+
 export function FoodDonationFormModal({
   isOpen,
   user,
@@ -61,7 +66,7 @@ export function FoodDonationFormModal({
   const [location, setLocation] = useState('');
   const [collectionInstructions, setCollectionInstructions] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [imageUrl, setImageUrl] = useState('none');
+  const [imageUrl, setImageUrl] = useState('media:bakery');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,13 +107,13 @@ export function FoodDonationFormModal({
       setLocation(user?.location || '');
       setCollectionInstructions('');
       setWhatsappNumber(user?.whatsappNumber ?? '');
-      setImageUrl(draftPrefill?.imageUrl ?? 'none');
+      setImageUrl(draftPrefill?.imageUrl ?? 'media:bakery');
     }
     setFormError(null);
     setSubmitting(false);
   }, [isOpen, editingDonation, draftPrefill, user?.id, foodCategories]);
 
-  if (!isOpen || !editingDonation) return null;
+  if (!isOpen) return null;
 
   const hasCurrentCategory = foodCategories.some((c) => c.name === category);
 
@@ -158,7 +163,7 @@ export function FoodDonationFormModal({
 
     setSubmitting(true);
     try {
-      const optimizedImageUrl = await compressImageDataUrlForFirestore(imageUrl, 'none');
+      const optimizedImageUrl = await compressImageDataUrlForFirestore(imageUrl, 'media:bakery');
       const payload = {
         title: title.trim(),
         category,
@@ -180,7 +185,9 @@ export function FoodDonationFormModal({
       };
       let savedDonation: FoodDonation;
       try {
-        const res = await api.updateFoodDonation(editingDonation.id, payload);
+        const res = editingDonation
+          ? await api.updateFoodDonation(editingDonation.id, payload)
+          : await api.createFoodDonation(payload);
         savedDonation = {
           ...res.donation,
           donorUid: res.donation.donorUid || auth.currentUser?.uid || user?.firebaseUid || undefined,
@@ -234,7 +241,7 @@ export function FoodDonationFormModal({
         </button>
 
         <h2 id="donate-food-title" className="font-display text-2xl font-semibold text-[#F4F7F4]">
-          Edit Surplus Food Donation
+          {editingDonation ? 'Edit Surplus Food Donation' : 'Publish Surplus Food Donation'}
         </h2>
         <p className="mt-1 text-xs text-[#C8D6CD]">
           Only offer food handled safely. Disclose preparation time, storage, allergens, and pickup deadline.
@@ -453,20 +460,30 @@ export function FoodDonationFormModal({
 
           <div className="rounded-xl border border-[#A9B78D]/20 bg-[#172620] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-[#D2DDD6]">Food Photo</span>
+              <span className="text-xs font-semibold text-[#D2DDD6]">Food Image</span>
+              <div className="flex gap-2">
+                {FOOD_PRESETS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setImageUrl(p.value)}
+                    className={`rounded-md px-2 py-1 text-[11px] font-medium cursor-pointer ${
+                      imageUrl === p.value
+                        ? 'bg-[#2B7A58] text-white'
+                        : 'bg-[#0D1612] text-[#C8D6CD] hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="mt-3 flex items-center gap-4">
-              {resolveImageSrc(imageUrl) ? (
-                <img
-                  src={resolveImageSrc(imageUrl)!}
-                  alt="Food donation preview"
-                  className="h-20 w-28 rounded-lg object-cover border border-[#A9B78D]/20"
-                />
-              ) : (
-                <div className="flex h-20 w-28 items-center justify-center rounded-lg border border-dashed border-[#A9B78D]/25 bg-[#0D1612] text-[11px] text-[#9BB0A3]">
-                  No photo
-                </div>
-              )}
+              <img
+                src={resolveImageSrc(imageUrl, 'bakery')}
+                alt="Food donation preview"
+                className="h-20 w-28 rounded-lg object-cover border border-[#A9B78D]/20"
+              />
               <div className="flex flex-col gap-2">
                 <label className="inline-flex items-center gap-2 rounded-lg border border-[#A9B78D]/30 bg-[#0D1612] px-3 py-1.5 text-xs font-semibold text-[#F4F7F4] hover:bg-[#111C17] cursor-pointer">
                   <Upload className="h-3.5 w-3.5 text-[#93C9A3]" />
@@ -482,10 +499,10 @@ export function FoodDonationFormModal({
                     }}
                   />
                 </label>
-                {resolveImageSrc(imageUrl) && (
+                {imageUrl.startsWith('data:image/') && (
                   <button
                     type="button"
-                    onClick={() => setImageUrl('none')}
+                    onClick={() => setImageUrl('media:bakery')}
                     className="text-left text-xs text-[#FCA5A5] hover:underline cursor-pointer"
                   >
                     Remove uploaded photo
@@ -508,7 +525,11 @@ export function FoodDonationFormModal({
               disabled={submitting}
               className="rounded-lg bg-[#2B7A58] px-5 py-2 text-xs font-semibold text-white hover:bg-[#348F68] disabled:opacity-60 cursor-pointer"
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+              {submitting
+                ? 'Saving...'
+                : editingDonation
+                  ? 'Save Changes'
+                  : 'Publish Food Donation'}
             </button>
           </div>
         </form>

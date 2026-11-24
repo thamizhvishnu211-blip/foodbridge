@@ -3,14 +3,13 @@ import {
   Check,
   Flag,
   GitCompare,
-  Package,
   Plus,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   X,
 } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { resolveImageSrc } from '../data/media';
 import { auth } from '../firebase';
 import { api } from '../services/api';
@@ -20,12 +19,13 @@ import {
   isOwnerOfResource,
   toggleSavedInFirestore,
 } from '../services/firestoreSync';
-import type { Category, ListingKind, MaterialListing, User } from '../types';
+import type { Category, MaterialListing, User } from '../types';
 import { buildWhatsAppUrl, formatINR, formatShortDate } from '../utils/format';
-import { AIVerifyGateModal } from './AIVerifyGateModal';
 import { ConfirmDialog } from './ConfirmDialog';
-import { MaterialFormModal } from './MaterialFormModal';
+import { MaterialFormModal, type MaterialDraftPrefill } from './MaterialFormModal';
 import { ReportModal } from './ReportModal';
+
+export type { MaterialDraftPrefill };
 
 interface MarketplaceViewProps {
   user: User | null;
@@ -33,15 +33,21 @@ interface MarketplaceViewProps {
   listings: MaterialListing[];
   savedIds: Set<string>;
   selectedListing: MaterialListing | null;
+  draftPrefill: MaterialDraftPrefill | null;
+  onClearDraftPrefill: () => void;
   onSelectListing: (listing: MaterialListing | null) => void;
   onRefresh: () => Promise<void>;
   onRequireAuth: () => void;
   onToast: (msg: string) => void;
-  onGoToAIVerifier: (kind: ListingKind) => void;
   onOpenOilRecovery?: () => void;
 }
 
 const CONDITIONS = ['Unused Surplus', 'Like New', 'Good', 'Fair / Needs Cleaning'];
+const IMAGE_PRESETS = [
+  { label: 'Aluminium / Metal', value: 'media:aluminium' },
+  { label: 'Timber / Pallets', value: 'media:wood' },
+  { label: 'Textiles / Linen', value: 'media:textile' },
+];
 
 export function MarketplaceView({
   user,
@@ -49,11 +55,12 @@ export function MarketplaceView({
   listings,
   savedIds,
   selectedListing,
+  draftPrefill,
+  onClearDraftPrefill,
   onSelectListing,
   onRefresh,
   onRequireAuth,
   onToast,
-  onGoToAIVerifier,
   onOpenOilRecovery,
 }: MarketplaceViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,10 +73,17 @@ export function MarketplaceView({
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
 
-  const [showAIGateModal, setShowAIGateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(Boolean(draftPrefill));
   const [editingListing, setEditingListing] = useState<MaterialListing | null>(null);
   const [cancelTarget, setCancelTarget] = useState<MaterialListing | null>(null);
   const [reportTarget, setReportTarget] = useState<{ type: 'material' | 'food'; id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (draftPrefill) {
+      setEditingListing(null);
+      setShowCreateModal(true);
+    }
+  }, [draftPrefill]);
 
   // Request form state inside Detail modal
   const [reqQty, setReqQty] = useState('10');
@@ -131,12 +145,13 @@ export function MarketplaceView({
       .slice(0, 3);
   }, [listings, selectedListing]);
 
-  const openEditForm = (editTarget: MaterialListing) => {
+  const openCreateForm = (editTarget?: MaterialListing) => {
     if (!user) {
       onRequireAuth();
       return;
     }
-    setEditingListing(editTarget);
+    setEditingListing(editTarget ?? null);
+    setShowCreateModal(true);
   };
 
   const handleToggleSave = async (id: string) => {
@@ -292,11 +307,11 @@ export function MarketplaceView({
           )}
           <button
             type="button"
-            onClick={() => setShowAIGateModal(true)}
+            onClick={() => openCreateForm()}
             className="inline-flex whitespace-nowrap items-center gap-2 rounded-lg bg-[#2B7A58] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer focus-ring"
           >
             <Plus className="h-4 w-4" />
-            <span>Add to List</span>
+            <span>List Material</span>
           </button>
         </div>
       </div>
@@ -426,26 +441,18 @@ export function MarketplaceView({
             const isSaved = savedIds.has(item.id);
             const isCompared = compareIds.includes(item.id);
             const waUrl = buildWhatsAppUrl(item.whatsappNumber, 'material', item.title);
-            const imgSrc = resolveImageSrc(item.imageUrl);
             return (
               <article
                 key={item.id}
                 className="flex flex-col overflow-hidden rounded-2xl border border-[#A9B78D]/18 bg-[#111C17]"
               >
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#0D1612]">
-                  {imgSrc ? (
-                    <img
-                      src={imgSrc}
-                      alt={item.title}
-                      referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#8FA89B]">
-                      <Package className="h-8 w-8 opacity-55" />
-                      <span className="text-xs">{item.category}</span>
-                    </div>
-                  )}
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#172620]">
+                  <img
+                    src={resolveImageSrc(item.imageUrl, 'aluminium')}
+                    alt={item.title}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
                   <div className="absolute right-3 top-3 flex gap-1.5">
                     <button
                       type="button"
@@ -563,16 +570,14 @@ export function MarketplaceView({
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
               <div className="lg:col-span-6 space-y-5">
-                {resolveImageSrc(selectedListing.imageUrl) && (
-                  <div className="aspect-[4/3] overflow-hidden rounded-xl border border-[#A9B78D]/20 bg-[#0D1612]">
-                    <img
-                      src={resolveImageSrc(selectedListing.imageUrl)!}
-                      alt={selectedListing.title}
-                      referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                )}
+                <div className="aspect-[4/3] overflow-hidden rounded-xl border border-[#A9B78D]/20 bg-[#172620]">
+                  <img
+                    src={resolveImageSrc(selectedListing.imageUrl, 'aluminium')}
+                    alt={selectedListing.title}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
 
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
@@ -699,7 +704,7 @@ export function MarketplaceView({
                         onClick={() => {
                           const target = selectedListing;
                           onSelectListing(null);
-                          openEditForm(target);
+                          openCreateForm(target);
                         }}
                         className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-2 text-xs font-semibold text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
                       >
@@ -850,23 +855,25 @@ export function MarketplaceView({
         </div>
       )}
 
-      {/* AI VERIFICATION GATE MODAL (NEW LISTINGS) */}
-      <AIVerifyGateModal
-        isOpen={showAIGateModal}
-        listingType="material"
-        onClose={() => setShowAIGateModal(false)}
-        onGoToAssistant={(kind) => onGoToAIVerifier(kind)}
-      />
-
-      {/* EDIT EXISTING LISTING MODAL ONLY */}
+      {/* CREATE / EDIT MODAL */}
       <MaterialFormModal
-        isOpen={Boolean(editingListing)}
+        isOpen={showCreateModal}
         user={user}
         categories={categories}
         editingListing={editingListing}
-        onClose={() => setEditingListing(null)}
-        onSaved={async () => {
-          onToast('Material listing updated.');
+        draftPrefill={draftPrefill}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingListing(null);
+          onClearDraftPrefill();
+        }}
+        onSaved={async (_listing, isEdit) => {
+          onClearDraftPrefill();
+          onToast(
+            isEdit
+              ? 'Material listing updated.'
+              : 'Material listing published to VERDORA Market.'
+          );
           await onRefresh();
         }}
       />

@@ -82,14 +82,12 @@ function mapMaterialDoc(id: string, d: Record<string, unknown>): MaterialListing
     location: String(d.location || ''),
     indicativePrice: d.indicativePrice === null || d.indicativePrice === undefined ? null : Number(d.indicativePrice),
     currency: String(d.currency || 'INR'),
-    imageUrl: String(d.imageUrl || 'none'),
+    imageUrl: String(d.imageUrl || 'media:aluminium'),
     availableUntil: String(d.availableUntil || new Date().toISOString()),
     pickupPreferences: String(d.pickupPreferences || ''),
     reuseApplications: Array.isArray(d.reuseApplications) ? d.reuseApplications.map(String) : [],
     whatsappNumber: null,
     status: String(d.status || 'Active') as MaterialStatus,
-    verificationId: typeof d.verificationId === 'string' ? d.verificationId : null,
-    aiVerificationStatus: typeof d.aiVerificationStatus === 'string' ? d.aiVerificationStatus : null,
     isHidden: Boolean(d.isHidden),
     hiddenReason: null,
     isDemo: false,
@@ -122,11 +120,9 @@ function mapFoodDoc(id: string, d: Record<string, unknown>): FoodDonation {
     dietaryInfo: String(d.dietaryInfo || ''),
     location: String(d.location || ''),
     collectionInstructions: String(d.collectionInstructions || ''),
-    imageUrl: String(d.imageUrl || 'none'),
+    imageUrl: String(d.imageUrl || 'media:bakery'),
     whatsappNumber: null,
     status: String(d.status || 'Available') as FoodDonationStatus,
-    verificationId: typeof d.verificationId === 'string' ? d.verificationId : null,
-    aiVerificationStatus: typeof d.aiVerificationStatus === 'string' ? d.aiVerificationStatus : null,
     isHidden: Boolean(d.isHidden),
     hiddenReason: null,
     isDemo: false,
@@ -152,8 +148,6 @@ function mapOilDoc(id: string, d: Record<string, unknown>): OilRecoveryListing {
     pickupWindow: String(d.pickupWindow || ''),
     location: String(d.location || ''),
     collectionStatus: String(d.collectionStatus || 'Available') as OilCollectionStatus,
-    verificationId: typeof d.verificationId === 'string' ? d.verificationId : null,
-    aiVerificationStatus: typeof d.aiVerificationStatus === 'string' ? d.aiVerificationStatus : null,
     whatsappNumber: null,
     isHidden: Boolean(d.isHidden),
     hiddenReason: null,
@@ -245,11 +239,6 @@ function mapOilEnquiryDoc(id: string, d: Record<string, unknown>): OilBuyerEnqui
   };
 }
 
-function isTerminalCatalogStatus(item: Record<string, unknown>): boolean {
-  const s = String(item.status ?? item.collectionStatus ?? '');
-  return s === 'Completed' || s === 'Cancelled' || s === 'Processed' || s === 'Expired';
-}
-
 export function mergeCatalogItems<T extends { id: string; updatedAt: string }>(
   localItems: T[],
   remoteItems: T[]
@@ -264,13 +253,9 @@ export function mergeCatalogItems<T extends { id: string; updatedAt: string }>(
       byId.set(l.id, l);
       continue;
     }
-    const localTerminal = isTerminalCatalogStatus(l as unknown as Record<string, unknown>);
-    const remoteTerminal = isTerminalCatalogStatus(r as unknown as Record<string, unknown>);
     const localTs = new Date(l.updatedAt).getTime() || 0;
     const remoteTs = new Date(r.updatedAt).getTime() || 0;
-    const preferRemote = remoteTerminal !== localTerminal ? remoteTerminal : remoteTs > localTs;
-
-    if (preferRemote) {
+    if (remoteTs > localTs) {
       byId.set(l.id, {
         ...l,
         ...r,
@@ -392,10 +377,10 @@ export async function syncMaterialToFirestore(listing: MaterialListing): Promise
   const docId = sanitizeDocId(listing.id);
   const path = `material_listings/${docId}`;
   const ref = doc(db, 'material_listings', docId);
-  const safeImageUrl = await compressImageDataUrlForFirestore(listing.imageUrl, 'none');
+  const safeImageUrl = await compressImageDataUrlForFirestore(listing.imageUrl, 'media:aluminium');
   const safeStatus = listing.status || 'Active';
   const isHidden = Boolean(listing.isHidden);
-  const isPublic = !isHidden && safeStatus !== 'Cancelled' && safeStatus !== 'Completed';
+  const isPublic = !isHidden && safeStatus !== 'Cancelled';
 
   let existingSnapData: Record<string, unknown> | null = null;
   try {
@@ -440,8 +425,6 @@ export async function syncMaterialToFirestore(listing: MaterialListing): Promise
         sellerVerified: Boolean(listing.sellerVerified),
         currency: 'INR',
         isHidden: false,
-        ...(listing.verificationId ? { verificationId: listing.verificationId.slice(0, 128) } : {}),
-        ...(listing.aiVerificationStatus ? { aiVerificationStatus: listing.aiVerificationStatus.slice(0, 64) } : {}),
         ...basePayload,
         status: 'Active',
         isPublic: true,
@@ -467,10 +450,10 @@ export async function syncFoodDonationToFirestore(donation: FoodDonation): Promi
   const docId = sanitizeDocId(donation.id);
   const path = `food_donations/${docId}`;
   const ref = doc(db, 'food_donations', docId);
-  const safeImageUrl = await compressImageDataUrlForFirestore(donation.imageUrl, 'none');
+  const safeImageUrl = await compressImageDataUrlForFirestore(donation.imageUrl, 'media:bakery');
   const safeStatus = donation.status || 'Available';
   const isHidden = Boolean(donation.isHidden);
-  const isPublic = !isHidden && !['Cancelled', 'Completed', 'Expired'].includes(safeStatus);
+  const isPublic = !isHidden && safeStatus !== 'Cancelled';
   const safePortions = Math.max(1, Math.round(Number(donation.portions)));
   const safeRemaining = Math.max(0, Math.min(safePortions, Math.round(Number(donation.remainingPortions))));
 
@@ -518,8 +501,6 @@ export async function syncFoodDonationToFirestore(donation: FoodDonation): Promi
         donorUid: fbUser.uid,
         donorVerified: Boolean(donation.donorVerified),
         isHidden: false,
-        ...(donation.verificationId ? { verificationId: donation.verificationId.slice(0, 128) } : {}),
-        ...(donation.aiVerificationStatus ? { aiVerificationStatus: donation.aiVerificationStatus.slice(0, 64) } : {}),
         ...basePayload,
         remainingPortions: safePortions,
         status: 'Available',
@@ -553,7 +534,7 @@ export async function syncOilListingToFirestore(lot: OilRecoveryListing): Promis
   const ref = doc(db, 'oil_recovery_listings', docId);
   const safeStatus = lot.collectionStatus || 'Available';
   const isHidden = Boolean(lot.isHidden);
-  const isPublic = !isHidden && safeStatus !== 'Cancelled' && safeStatus !== 'Processed';
+  const isPublic = !isHidden && safeStatus !== 'Cancelled';
 
   let existingSnapData: Record<string, unknown> | null = null;
   try {
@@ -584,8 +565,6 @@ export async function syncOilListingToFirestore(lot: OilRecoveryListing): Promis
         location: lot.location.trim().slice(0, 120),
         collectionStatus: 'Available',
         hasWhatsapp: Boolean(lot.whatsappNumber),
-        ...(lot.verificationId ? { verificationId: lot.verificationId.slice(0, 128) } : {}),
-        ...(lot.aiVerificationStatus ? { aiVerificationStatus: lot.aiVerificationStatus.slice(0, 64) } : {}),
         isHidden: false,
         isPublic: true,
         createdAt: serverTimestamp(),
@@ -912,93 +891,9 @@ export async function updateMaterialRequestStatusInFirestore(
       patch.handoverConfirmedBySeller = true;
     }
     await updateDoc(ref, patch);
-
-    // Immediately remove bought/completed material listing from public marketplace across all devices
-    if (nextStatus === 'Completed') {
-      await markMaterialListingCompletedInFirestore(reqItem.listingId, docId).catch(() => {});
-    }
     return true;
   } catch (err) {
     if (isPermissionDeniedError(err)) handleFirestoreError(err, OperationType.UPDATE, path);
-    return false;
-  }
-}
-
-export async function markMaterialListingCompletedInFirestore(
-  listingId: string,
-  requestId: string
-): Promise<boolean> {
-  const fbUser = auth.currentUser;
-  if (!fbUser || !fbUser.emailVerified) return false;
-  const docId = sanitizeDocId(listingId);
-  const reqId = sanitizeDocId(requestId);
-  const ref = doc(db, 'material_listings', docId);
-  try {
-    const snap = await getDocFromServer(ref);
-    if (!snap.exists()) return false;
-    const status = String(snap.data().status || '');
-    if (status === 'Completed' || status === 'Cancelled') return true;
-    await updateDoc(ref, {
-      status: 'Completed',
-      isPublic: false,
-      completedByRequestId: reqId,
-      updatedAt: serverTimestamp(),
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function markFoodDonationCompletedInFirestore(
-  donationId: string,
-  requestId: string
-): Promise<boolean> {
-  const fbUser = auth.currentUser;
-  if (!fbUser || !fbUser.emailVerified) return false;
-  const docId = sanitizeDocId(donationId);
-  const reqId = sanitizeDocId(requestId);
-  const ref = doc(db, 'food_donations', docId);
-  try {
-    const snap = await getDocFromServer(ref);
-    if (!snap.exists()) return false;
-    const status = String(snap.data().status || '');
-    if (status === 'Completed' || status === 'Cancelled' || status === 'Expired') return true;
-    await updateDoc(ref, {
-      status: 'Completed',
-      remainingPortions: 0,
-      isPublic: false,
-      completedByRequestId: reqId,
-      updatedAt: serverTimestamp(),
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function markOilListingProcessedInFirestore(
-  listingId: string,
-  enquiryId: string
-): Promise<boolean> {
-  const fbUser = auth.currentUser;
-  if (!fbUser || !fbUser.emailVerified) return false;
-  const docId = sanitizeDocId(listingId);
-  const enqId = sanitizeDocId(enquiryId);
-  const ref = doc(db, 'oil_recovery_listings', docId);
-  try {
-    const snap = await getDocFromServer(ref);
-    if (!snap.exists()) return false;
-    const status = String(snap.data().collectionStatus || '');
-    if (status === 'Processed' || status === 'Cancelled') return true;
-    await updateDoc(ref, {
-      collectionStatus: 'Processed',
-      isPublic: false,
-      completedByEnquiryId: enqId,
-      updatedAt: serverTimestamp(),
-    });
-    return true;
-  } catch {
     return false;
   }
 }
@@ -1041,14 +936,6 @@ export async function updateFoodRequestStatusInFirestore(
         });
       }
     }
-
-    if (nextStatus === 'Completed') {
-      const donRef = doc(db, 'food_donations', sanitizeDocId(reqItem.donationId));
-      const donSnap = await getDocFromServer(donRef);
-      if (donSnap.exists() && Number(donSnap.data().remainingPortions ?? 0) === 0) {
-        await markFoodDonationCompletedInFirestore(reqItem.donationId, docId).catch(() => {});
-      }
-    }
     return true;
   } catch (err) {
     if (isPermissionDeniedError(err)) handleFirestoreError(err, OperationType.UPDATE, path);
@@ -1079,9 +966,6 @@ export async function updateOilEnquiryStatusInFirestore(
       patch.supplierWhatsapp = user.whatsappNumber.slice(0, 24);
     }
     await updateDoc(ref, patch);
-    if (nextStatus === 'Completed') {
-      await markOilListingProcessedInFirestore(enqItem.listingId, docId).catch(() => {});
-    }
     return true;
   } catch (err) {
     if (isPermissionDeniedError(err)) handleFirestoreError(err, OperationType.UPDATE, path);
@@ -1098,7 +982,7 @@ export async function backfillOwnedSQLiteRecordsToFirestore(params: {
   if (!fbUser || !fbUser.emailVerified) return;
 
   for (const m of params.myMaterials) {
-    if (!m.isDemo && !m.isHidden && !['Cancelled', 'Completed'].includes(m.status)) {
+    if (!m.isDemo && !m.isHidden && m.status !== 'Cancelled') {
       const snap = await getDocFromServer(doc(db, 'material_listings', sanitizeDocId(m.id))).catch(() => null);
       if (snap && !snap.exists()) {
         await syncMaterialToFirestore(m).catch(() => {});
@@ -1106,7 +990,7 @@ export async function backfillOwnedSQLiteRecordsToFirestore(params: {
     }
   }
   for (const d of params.myDonations) {
-    if (!d.isDemo && !d.isHidden && !['Cancelled', 'Expired', 'Completed'].includes(d.status)) {
+    if (!d.isDemo && !d.isHidden && !['Cancelled', 'Expired'].includes(d.status)) {
       const snap = await getDocFromServer(doc(db, 'food_donations', sanitizeDocId(d.id))).catch(() => null);
       if (snap && !snap.exists()) {
         await syncFoodDonationToFirestore(d).catch(() => {});
@@ -1114,7 +998,7 @@ export async function backfillOwnedSQLiteRecordsToFirestore(params: {
     }
   }
   for (const o of params.myOilListings) {
-    if (!o.isHidden && !['Cancelled', 'Processed'].includes(o.collectionStatus)) {
+    if (!o.isHidden && o.collectionStatus !== 'Cancelled') {
       const snap = await getDocFromServer(doc(db, 'oil_recovery_listings', sanitizeDocId(o.id))).catch(() => null);
       if (snap && !snap.exists()) {
         await syncOilListingToFirestore(o).catch(() => {});

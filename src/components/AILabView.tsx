@@ -3,49 +3,38 @@ import {
   ArrowRight,
   CheckCircle2,
   Compass,
-  Loader2,
   MessageCircle,
   Package,
   RotateCcw,
   Scan,
   Send,
-  ShieldCheck,
   Sparkles,
   Upload,
   Utensils,
-  X,
 } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
-import { resolveImageSrc } from '../data/media';
+import { MEDIA_ASSETS, resolveImageSrc } from '../data/media';
 import { api } from '../services/api';
 import type {
   Category,
   FoodDonation,
   FoodScanResult,
-  ListingKind,
   MaterialListing,
   MaterialScanResult,
   MatchResult,
-  OilRecoveryListing,
   ResourceGuideResult,
-  User,
 } from '../types';
 import { buildWhatsAppUrl, formatDateTime, formatINR, isExpiredDate } from '../utils/format';
-import { AIListingVerifier, type AIScannerPrefillDraft } from './AIListingVerifier';
+import type { FoodDraftPrefill } from './FoodRescueView';
+import type { MaterialDraftPrefill } from './MarketplaceView';
 
 interface AILabViewProps {
   initialSection?: string;
-  initialVerifyType?: ListingKind;
-  user: User | null;
   categories: Category[];
   listings: MaterialListing[];
   donations: FoodDonation[];
-  onRequireAuth: () => void;
-  onPublished: (
-    kind: ListingKind,
-    item: MaterialListing | FoodDonation | OilRecoveryListing
-  ) => Promise<void>;
-  onToast: (msg: string) => void;
+  onCreateListingFromScan: (draft: MaterialDraftPrefill) => void;
+  onCreateFoodDonationFromAI: (draft: FoodDraftPrefill) => void;
   onInspectListing: (listing: MaterialListing) => void;
   onInspectDonation: (donation: FoodDonation) => void;
 }
@@ -58,41 +47,49 @@ interface FoodMatchResult {
 }
 
 const STARTER_PROMPTS = [
-  'How do I scan and list surplus aluminium or wood pallets?',
   'I need surplus food for a community kitchen — guide me',
   'I want reusable wood pallets or metal objects — guide me',
   'How do I donate surplus food responsibly?',
-  'How does Verdora AI verify my listing before publishing?',
+  'What can I do with leftover wooden pallets?',
+  'How can I list surplus aluminium in ₹ INR clearly?',
 ];
 
 export function AILabView({
   initialSection = 'scanner',
-  initialVerifyType = 'material',
-  user,
   categories,
   listings,
   donations,
-  onRequireAuth,
-  onPublished,
-  onToast,
+  onCreateListingFromScan,
+  onCreateFoodDonationFromAI,
   onInspectListing,
   onInspectDonation,
 }: AILabViewProps) {
-  const [section, setSection] = useState<'scanner' | 'verify' | 'matcher' | 'assistant'>(
-    initialSection === 'verify' || initialSection === 'matcher' || initialSection === 'assistant'
-      ? initialSection
-      : 'scanner'
+  const [section, setSection] = useState<'scanner' | 'matcher' | 'assistant'>(
+    initialSection === 'matcher' || initialSection === 'assistant' ? initialSection : 'scanner'
   );
-  const [verifierPrefill, setVerifierPrefill] = useState<AIScannerPrefillDraft | null>(null);
 
-  // --- OLD AI FEATURE RESTORED: AI MATERIAL & FOOD SCANNER STATE ---
-  const [scanKind, setScanKind] = useState<'material' | 'food'>('material');
-  const [scanImage, setScanImage] = useState<string | null>(null);
-  const [scanNotes, setScanNotes] = useState('');
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [materialScanResult, setMaterialScanResult] = useState<MaterialScanResult | null>(null);
+  // --- SCANNER STATE (MATERIAL OR FOOD) ---
+  const [scannerKind, setScannerKind] = useState<'material' | 'food'>('material');
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [scanContext, setScanContext] = useState('');
+  const [scanResult, setScanResult] = useState<MaterialScanResult | null>(null);
   const [foodScanResult, setFoodScanResult] = useState<FoodScanResult | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  // Editable material draft fields
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriceInr, setEditPriceInr] = useState('');
+
+  // Editable food donation draft fields
+  const [editFoodTitle, setEditFoodTitle] = useState('');
+  const [editFoodCategory, setEditFoodCategory] = useState('');
+  const [editFoodPortions, setEditFoodPortions] = useState('25');
+  const [editFoodStorage, setEditFoodStorage] = useState('');
+  const [editFoodAllergens, setEditFoodAllergens] = useState('');
+  const [editFoodDescription, setEditFoodDescription] = useState('');
 
   // --- MATCHMAKER & AI GUIDE STATE ---
   const [matcherKind, setMatcherKind] = useState<'material' | 'food'>('material');
@@ -116,7 +113,7 @@ export function AILabView({
     {
       role: 'assistant',
       content:
-        'Welcome to the VERDORA AI Assistant (India · ₹ INR). Scan photos of reusable materials or surplus food in the AI Scanner, verify & publish listings in the AI Listing Verifier, or ask me to help find live surplus resources near you.',
+        'Welcome to the VERDORA Eco AI Assistant (India · ₹ INR). Tell me if you want to create a Material or Food Donation listing, or tell me what food or reusable object you are looking for and I will guide you to live options.',
     },
   ]);
   const [chatInput, setChatInput] = useState('');
@@ -133,95 +130,13 @@ export function AILabView({
     [categories]
   );
 
-  const handleSwitchScanKind = (nextKind: 'material' | 'food') => {
-    setScanKind(nextKind);
+  const handleSwitchScannerKind = (nextKind: 'material' | 'food') => {
+    setScannerKind(nextKind);
     setScanError(null);
-  };
-
-  const handleScanImageUpload = (file: File | undefined) => {
-    if (!file) return;
-    setScanError(null);
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setScanError('Please upload a JPEG, PNG, or WebP photo.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setScanError('Photo exceeds the 5 MB upload limit.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setScanImage(reader.result);
-      }
-    };
-    reader.onerror = () => setScanError('Could not read the selected photo.');
-    reader.readAsDataURL(file);
-  };
-
-  const handleRunScan = async () => {
-    if (!scanImage && scanNotes.trim().length < 3) {
-      setScanError(
-        scanKind === 'material'
-          ? 'Upload a photo of the material/object or write a brief description to scan.'
-          : 'Upload a photo of the surplus food or write a brief description to scan.'
-      );
-      return;
-    }
-    setScanError(null);
-    setScanning(true);
-    try {
-      if (scanKind === 'material') {
-        const result = await api.scanMaterial(scanImage, scanNotes.trim());
-        setMaterialScanResult(result);
-        setFoodScanResult(null);
-      } else {
-        const result = await api.scanFood(scanImage, scanNotes.trim());
-        setFoodScanResult(result);
-        setMaterialScanResult(null);
-      }
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : 'AI scan failed. Please try again.');
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const handleCreateMaterialFromScan = () => {
-    if (!materialScanResult) return;
-    setVerifierPrefill({
-      nonce: Date.now(),
-      kind: 'material',
-      title: materialScanResult.suggestedTitle,
-      category: materialScanResult.suggestedCategory,
-      description: materialScanResult.suggestedDescription,
-      condition: materialScanResult.visibleCondition,
-      reuseApplications: materialScanResult.reuseApplications,
-      imageUrl: scanImage || undefined,
-    });
-    setSection('verify');
-    onToast('Scan draft loaded into AI Listing Verifier. Review details and publish!');
-  };
-
-  const handleCreateFoodFromScan = () => {
-    if (!foodScanResult) return;
-    setVerifierPrefill({
-      nonce: Date.now(),
-      kind: 'food',
-      title: foodScanResult.suggestedTitle,
-      category: foodScanResult.suggestedCategory,
-      description: foodScanResult.suggestedDescription,
-      quantity: foodScanResult.estimatedQuantity,
-      unit: foodScanResult.estimatedUnit,
-      portions: foodScanResult.estimatedPortions,
-      storageInfo: foodScanResult.storageAdvice,
-      packagingInfo: foodScanResult.packagingAdvice,
-      allergens: foodScanResult.potentialAllergens,
-      dietaryInfo: foodScanResult.dietaryTags,
-      imageUrl: scanImage || undefined,
-    });
-    setSection('verify');
-    onToast('Food scan draft loaded into AI Listing Verifier. Confirm safety details and publish!');
+    setScanResult(null);
+    setFoodScanResult(null);
+    setImageDataUrl(null);
+    setScanContext('');
   };
 
   const handleSwitchMatcherKind = (nextKind: 'material' | 'food') => {
@@ -237,6 +152,93 @@ export function AILabView({
       setNeedQty('100');
     }
     setHasSearchedMatch(true);
+  };
+
+  const handleFileSelect = (file: File | undefined) => {
+    if (!file) return;
+    setScanError(null);
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setScanError('Unsupported image format. Please upload a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setScanError('Image exceeds the 5 MB upload limit.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setImageDataUrl(reader.result);
+        setScanResult(null);
+        setFoodScanResult(null);
+      }
+    };
+    reader.onerror = () => {
+      setScanError('Could not read the selected image file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const loadSamplePhoto = async (assetUrl: string, contextHint: string) => {
+    setScanError(null);
+    try {
+      const resp = await fetch(assetUrl);
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setImageDataUrl(reader.result);
+          setScanContext(contextHint);
+          setScanResult(null);
+          setFoodScanResult(null);
+        }
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      setScanError('Unable to load sample studio image.');
+    }
+  };
+
+  const handleRunScan = async () => {
+    if (!imageDataUrl && scanContext.trim().length < 5) {
+      setScanError(
+        scannerKind === 'food'
+          ? 'Please upload a food photo or write a brief description (at least 5 characters) of the surplus food.'
+          : 'Please upload an object/material photo or write a brief description (at least 5 characters).'
+      );
+      return;
+    }
+    setScanError(null);
+    setScanning(true);
+    try {
+      if (scannerKind === 'food') {
+        const res = await api.scanFood(imageDataUrl, scanContext.trim());
+        setFoodScanResult(res);
+        setEditFoodTitle(res.suggestedTitle);
+        setEditFoodCategory(res.suggestedCategory);
+        setEditFoodPortions(String(res.estimatedPortions));
+        setEditFoodStorage(res.storageAdvice);
+        setEditFoodAllergens(res.potentialAllergens);
+        setEditFoodDescription(res.suggestedDescription);
+      } else {
+        const res = await api.scanMaterial(imageDataUrl, scanContext.trim());
+        setScanResult(res);
+        setEditTitle(res.suggestedTitle);
+        setEditCategory(res.suggestedCategory);
+        setEditDescription(res.suggestedDescription);
+        setEditPriceInr('');
+      }
+    } catch (err) {
+      setScanError(
+        err instanceof Error
+          ? err.message
+          : scannerKind === 'food'
+            ? 'Surplus food analysis failed.'
+            : 'Material scan failed.'
+      );
+    } finally {
+      setScanning(false);
+    }
   };
 
   // Rule-based explainable relevance scoring for Material Objects
@@ -436,18 +438,18 @@ export function AILabView({
       <div className="flex flex-col justify-between gap-6 border-b border-[#A9B78D]/15 pb-8 lg:flex-row lg:items-end">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-            VERDORA AI Lab · India (₹ INR)
+            VERDORA Intelligence · India (₹ INR)
           </p>
           <h1 className="mt-2 font-display text-3xl font-semibold text-[#F4F7F4] sm:text-4xl">
-            AI Scanner, Listing Verification & Smart Matching
+            AI Listing Creator, Smart Matching & Guide
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[#C8D6CD]">
-            Scan reusable materials or surplus food with AI vision, verify listings before
-            publishing, match live resources, or ask the VERDORA Eco Assistant.
+            Create both Reusable Material listings and Food Rescue donations with AI, or get guided
+            step-by-step to live surplus food or reusable objects available near you.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-1 rounded-xl border border-[#A9B78D]/18 bg-[#172620] p-1 self-start">
+        <div className="inline-flex rounded-xl border border-[#A9B78D]/18 bg-[#172620] p-1 self-start">
           <button
             type="button"
             onClick={() => setSection('scanner')}
@@ -456,17 +458,7 @@ export function AILabView({
             }`}
           >
             <Scan className="h-3.5 w-3.5" />
-            <span>AI Scanner</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSection('verify')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-              section === 'verify' ? 'bg-[#2B7A58] text-white shadow-xs' : 'text-[#C8D6CD] hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>AI Listing Verifier</span>
+            <span>AI Scanner & Creator</span>
           </button>
           <button
             type="button"
@@ -491,443 +483,518 @@ export function AILabView({
         </div>
       </div>
 
-      {/* SECTION 0: RESTORED AI MATERIAL & FOOD SCANNER */}
+      {/* SECTION 1: AI RESOURCE & FOOD SCANNER / LISTING CREATOR */}
       {section === 'scanner' && (
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
-          {/* Left: Upload & Scan Form */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#A9B78D]/20 bg-[#0D1612] p-1">
+          <div className="lg:col-span-5 space-y-5">
+            <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-6">
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#A9B78D]/20 bg-[#0D1612] p-1 mb-5">
                 <button
                   type="button"
-                  onClick={() => handleSwitchScanKind('material')}
+                  onClick={() => handleSwitchScannerKind('material')}
                   className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold cursor-pointer ${
-                    scanKind === 'material'
+                    scannerKind === 'material'
                       ? 'bg-[#2B7A58] text-white'
                       : 'text-[#C8D6CD] hover:text-white'
                   }`}
                 >
                   <Package className="h-3.5 w-3.5" />
-                  <span>Scan Material</span>
+                  <span>Object / Material</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSwitchScanKind('food')}
+                  onClick={() => handleSwitchScannerKind('food')}
                   className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold cursor-pointer ${
-                    scanKind === 'food'
+                    scannerKind === 'food'
                       ? 'bg-[#2B7A58] text-white'
                       : 'text-[#C8D6CD] hover:text-white'
                   }`}
                 >
                   <Utensils className="h-3.5 w-3.5" />
-                  <span>Scan Surplus Food</span>
+                  <span>Donate Surplus Food</span>
                 </button>
               </div>
 
-              <div>
-                <h2 className="font-display text-xl font-semibold text-[#F4F7F4]">
-                  {scanKind === 'material'
-                    ? 'AI Material & Object Scanner'
-                    : 'AI Surplus Food Scanner'}
-                </h2>
-                <p className="mt-1 text-xs text-[#C8D6CD]">
-                  {scanKind === 'material'
-                    ? 'Upload a photo of your surplus material or describe it below. AI identifies the category, visible condition, reuse ideas, and drafts your listing.'
-                    : 'Upload a photo of your surplus food batch or describe it below. AI estimates portions, suggests storage & packaging guidance, flags potential allergens, and drafts your donation.'}
-                </p>
+              <h2 className="font-display text-xl font-semibold text-[#F4F7F4]">
+                {scannerKind === 'food'
+                  ? '1. Upload Food Photo or Describe Batch'
+                  : '1. Upload Object Photo or Describe Material'}
+              </h2>
+              <p className="mt-1 text-xs text-[#C8D6CD]">
+                {scannerKind === 'food'
+                  ? 'Upload a photo (JPEG, PNG, WebP up to 5 MB), test a sample food batch, or describe surplus food below to auto-draft a Food Rescue donation.'
+                  : 'Upload a photo (JPEG, PNG, WebP up to 5 MB), test a sample studio photo, or describe an object/material below to auto-draft a ₹ INR listing.'}
+              </p>
+
+              <div className="mt-4">
+                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#A9B78D]/35 bg-[#0D1612] p-6 text-center hover:bg-[#172620] cursor-pointer">
+                  <Upload className="h-6 w-6 text-[#93C9A3]" />
+                  <span className="mt-2 text-xs font-semibold text-[#F4F7F4]">
+                    Choose photo from device (Optional)
+                  </span>
+                  <span className="mt-1 text-[11px] text-[#9BB0A3]">
+                    Analyzed securely via server-side Gemini endpoint
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.currentTarget.value = '';
+                      handleFileSelect(file);
+                    }}
+                  />
+                </label>
               </div>
 
-              {/* Photo Upload Zone — Only user-uploaded photos */}
-              <div>
-                <label className="block text-xs font-semibold text-[#D2DDD6]">
-                  Upload Photo (Optional if description is provided)
-                </label>
-                {scanImage ? (
-                  <div className="mt-2 relative overflow-hidden rounded-xl border border-[#A9B78D]/25 bg-[#0D1612]">
-                    <img
-                      src={scanImage}
-                      alt="Uploaded item to scan"
-                      className="h-52 w-full object-cover"
-                    />
+              <div className="mt-4">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9BB0A3]">
+                  Quick Sample Photos
+                </div>
+                {scannerKind === 'material' ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setScanImage(null)}
-                      className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-lg bg-[#0A110E]/85 px-2.5 py-1.5 text-xs font-semibold text-[#F4F7F4] hover:bg-[#361619] hover:text-[#FFB3B8] cursor-pointer"
+                      onClick={() =>
+                        loadSamplePhoto(MEDIA_ASSETS.aluminium, '2mm brushed aluminium offcuts from CNC cutting')
+                      }
+                      className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-1.5 text-xs font-medium text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
                     >
-                      <X className="h-3.5 w-3.5" />
-                      <span>Remove</span>
+                      Aluminium Offcuts
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        loadSamplePhoto(MEDIA_ASSETS.wood, 'Heat-treated timber shipping pallets stored indoors')
+                      }
+                      className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-1.5 text-xs font-medium text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
+                    >
+                      Timber Pallets
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        loadSamplePhoto(MEDIA_ASSETS.textile, 'Unbleached linen and cotton fabric rolls')
+                      }
+                      className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-1.5 text-xs font-medium text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
+                    >
+                      Textile Bolts
                     </button>
                   </div>
                 ) : (
-                  <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#A9B78D]/35 bg-[#0D1612] px-4 py-8 text-center transition-colors hover:border-[#93C9A3]/60 hover:bg-[#14231C]">
-                    <Upload className="h-6 w-6 text-[#93C9A3]" />
-                    <div className="text-xs font-semibold text-[#F4F7F4]">
-                      Click to upload JPEG, PNG, or WebP photo
-                    </div>
-                    <div className="text-[11px] text-[#9BB0A3]">Up to 5 MB · Real photo only</div>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        handleScanImageUpload(e.target.files?.[0]);
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        loadSamplePhoto(
+                          MEDIA_ASSETS.bakery,
+                          'Freshly baked sourdough loaves, multigrain bread & buns from afternoon bakery batch (~30 portions)'
+                        )
+                      }
+                      className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-1.5 text-xs font-medium text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
+                    >
+                      Bakery Surplus
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        loadSamplePhoto(
+                          MEDIA_ASSETS.produce,
+                          'Surplus fresh farm vegetables and seasonal fruit crates ready for community kitchens (~40 portions)'
+                        )
+                      }
+                      className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-1.5 text-xs font-medium text-[#F4F7F4] hover:bg-[#21362D] cursor-pointer"
+                    >
+                      Fresh Produce
+                    </button>
+                  </div>
                 )}
               </div>
 
-              <div>
+              {imageDataUrl && (
+                <div className="mt-5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#D2DDD6]">
+                    <span>Preview</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageDataUrl(null);
+                        setScanResult(null);
+                        setFoodScanResult(null);
+                      }}
+                      className="text-[#FCA5A5] hover:underline cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <img
+                    src={imageDataUrl}
+                    alt={scannerKind === 'food' ? 'Food donation preview' : 'Material upload preview'}
+                    className="mt-2 aspect-[4/3] w-full rounded-xl object-cover border border-[#A9B78D]/20"
+                  />
+                </div>
+              )}
+
+              <div className="mt-4">
                 <label className="block text-xs font-semibold text-[#D2DDD6]">
-                  {scanKind === 'material'
-                    ? 'Material / Object Notes (Optional with photo)'
-                    : 'Food Batch Description (Optional with photo)'}
+                  {scannerKind === 'food'
+                    ? 'Food Details (Dish/items, portions, veg/non-veg, storage)'
+                    : 'Object / Material Details (Dimensions, count, condition)'}
                 </label>
                 <textarea
                   rows={3}
-                  value={scanNotes}
-                  onChange={(e) => setScanNotes(e.target.value)}
+                  value={scanContext}
+                  onChange={(e) => setScanContext(e.target.value)}
                   placeholder={
-                    scanKind === 'material'
-                      ? 'e.g., 120 kg clean 6061 aluminium sheet offcuts, 2mm thickness, stored dry indoors...'
-                      : 'e.g., 40 fresh vegetable pulao boxes and whole-wheat rolls prepared at 1 PM today, vegetarian...'
+                    scannerKind === 'food'
+                      ? 'e.g., 35 portions cooked veg pulao and dal prepared at 1 PM, kept hot in sealed steel vessels'
+                      : 'e.g., 4 sturdy wooden office tables or 2mm aluminium sheets stored dry in Indiranagar'
                   }
-                  className="mt-1.5 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
+                  className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
                 />
               </div>
 
               {scanError && (
-                <div className="flex items-start gap-2 rounded-lg border border-[#E06C75]/35 bg-[#361619] px-3.5 py-2.5 text-xs text-[#FFB3B8]">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#E06C75]/35 bg-[#361619] px-3 py-2.5 text-xs text-[#FFB3B8]">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{scanError}</span>
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={scanning}
-                  onClick={() => void handleRunScan()}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[#2B7A58] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] disabled:opacity-60 cursor-pointer"
-                >
-                  {scanning ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Analyzing with Verdora AI...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Scan className="h-4 w-4" />
-                      <span>
-                        {scanKind === 'material'
-                          ? 'Scan Material with AI'
-                          : 'Scan Surplus Food with AI'}
-                      </span>
-                    </>
-                  )}
-                </button>
-                {(scanImage || scanNotes || materialScanResult || foodScanResult) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setScanImage(null);
-                      setScanNotes('');
-                      setScanError(null);
-                      setMaterialScanResult(null);
-                      setFoodScanResult(null);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-3 py-2.5 text-xs font-semibold text-[#C8D6CD] hover:text-white cursor-pointer"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    <span>Reset</span>
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                disabled={scanning || (!imageDataUrl && scanContext.trim().length < 5)}
+                onClick={handleRunScan}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#2B7A58] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#348F68] disabled:opacity-50 cursor-pointer"
+              >
+                <Scan className="h-4 w-4" />
+                <span>
+                  {scanning
+                    ? scannerKind === 'food'
+                      ? 'Generating Food Donation Draft...'
+                      : 'Analyzing Material / Object...'
+                    : scannerKind === 'food'
+                      ? 'Generate Food Donation Draft'
+                      : 'Analyze Object / Material'}
+                </span>
+              </button>
             </div>
           </div>
 
-          {/* Right: Structured AI Scan Results */}
-          <div className="lg:col-span-7 space-y-5">
-            {!materialScanResult && !foodScanResult ? (
-              <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-8 flex flex-col justify-center min-h-[380px]">
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#93C9A3]/30 bg-[#172620] text-[#93C9A3]">
-                  <Scan className="h-5 w-5" />
-                </div>
-                <h3 className="mt-4 font-display text-2xl font-semibold text-[#F4F7F4]">
-                  Ready to Analyze Your {scanKind === 'material' ? 'Material Batch' : 'Surplus Food'}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#C8D6CD]">
-                  {scanKind === 'material'
-                    ? 'Upload a photo or enter details on the left to classify reusable materials, surface condition notes, discover secondary reuse applications, and prefill a verified Marketplace listing.'
-                    : 'Upload a photo or describe your surplus food on the left to estimate portions, review storage and packaging advice, highlight potential allergens, and prefill a verified Food Rescue donation.'}
-                </p>
-                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 text-xs text-[#D2DDD6]">
-                  <div className="rounded-xl border border-[#A9B78D]/15 bg-[#0D1612] p-3.5">
-                    <div className="font-semibold text-[#93C9A3]">1. Instant AI Classification</div>
-                    <p className="mt-1 text-[#C8D6CD]">
-                      Identifies category, condition or portion estimate, and clean listing copy.
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-[#A9B78D]/15 bg-[#0D1612] p-3.5">
-                    <div className="font-semibold text-[#93C9A3]">2. One-Click Draft to Verifier</div>
-                    <p className="mt-1 text-[#C8D6CD]">
-                      Transfers your scanned fields & photo directly into Verdora AI Verification.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : materialScanResult ? (
-              <div className="rounded-2xl border border-[#93C9A3]/30 bg-[#111C17] p-6 space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#A9B78D]/15 pb-4">
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Material AI Scan Complete</span>
-                    </div>
-                    <h3 className="mt-1.5 font-display text-2xl font-semibold text-[#F4F7F4]">
-                      {materialScanResult.predictedMaterial}
-                    </h3>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block rounded-lg border border-[#93C9A3]/30 bg-[#172620] px-2.5 py-1 text-xs font-semibold text-[#93C9A3]">
-                      {materialScanResult.confidenceLabel}
-                      {materialScanResult.confidenceScore !== null
-                        ? ` · ${Math.round(materialScanResult.confidenceScore)}%`
-                        : ''}
-                    </span>
-                    <div className="mt-1 text-[11px] text-[#9BB0A3]">
-                      {materialScanResult.isDemoFallback ? 'Offline Analysis Mode' : 'Gemini Vision'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3.5">
-                    <div className="text-[11px] uppercase tracking-wider text-[#9BB0A3]">
-                      Suggested Category
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-[#F4F7F4]">
-                      {materialScanResult.suggestedCategory}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3.5">
-                    <div className="text-[11px] uppercase tracking-wider text-[#9BB0A3]">
-                      Visible Condition
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-[#F4F7F4]">
-                      {materialScanResult.visibleCondition}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-4 space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                    Suggested Listing Draft
-                  </div>
-                  <div className="text-sm font-semibold text-[#F4F7F4]">
-                    {materialScanResult.suggestedTitle}
-                  </div>
-                  <p className="text-xs leading-relaxed text-[#D2DDD6]">
-                    {materialScanResult.suggestedDescription}
+          <div className="lg:col-span-7">
+            {scannerKind === 'material' ? (
+              !scanResult ? (
+                <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-10 text-center">
+                  <Package className="h-8 w-8 text-[#93C9A3]" />
+                  <h3 className="mt-3 font-display text-xl font-semibold text-[#F4F7F4]">
+                    Ready to Draft a Reusable Object or Material Listing
+                  </h3>
+                  <p className="mt-2 max-w-md text-sm text-[#C8D6CD]">
+                    Upload a photo or describe any reusable object or material to inspect condition,
+                    reuse applications, a quality checklist, and pre-fill your ₹ INR listing.
                   </p>
                 </div>
-
-                {materialScanResult.observations.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      Observations
-                    </h4>
-                    <ul className="mt-2 space-y-1.5 text-xs text-[#D2DDD6] list-disc pl-5">
-                      {materialScanResult.observations.map((obs) => (
-                        <li key={obs}>{obs}</li>
-                      ))}
-                    </ul>
+              ) : (
+                <div className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-6 space-y-6">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#A9B78D]/15 pb-4">
+                    <div>
+                      <div className="text-xs text-[#9BB0A3]">
+                        {scanResult.isDemoFallback
+                          ? 'Offline Draft Mode (No live API key configured)'
+                          : 'Gemini Vision Assessment'}{' '}
+                        · {scanResult.confidenceLabel}
+                      </div>
+                      <h2 className="mt-1 font-display text-2xl font-semibold text-[#F4F7F4]">
+                        {scanResult.predictedMaterial}
+                      </h2>
+                    </div>
+                    <div className="text-right text-xs">
+                      <div className="text-[#9BB0A3]">Suggested Category</div>
+                      <div className="font-semibold text-[#93C9A3]">{scanResult.suggestedCategory}</div>
+                    </div>
                   </div>
-                )}
 
-                {materialScanResult.reuseApplications.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      Recommended Reuse Applications
-                    </h4>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {materialScanResult.reuseApplications.map((app) => (
-                        <span
-                          key={app}
-                          className="rounded-lg border border-[#A9B78D]/25 bg-[#172620] px-2.5 py-1 text-xs text-[#F4F7F4]"
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 text-xs">
+                    <div className="rounded-xl border border-[#A9B78D]/15 bg-[#172620] p-4">
+                      <div className="font-semibold text-[#93C9A3]">Visible Condition</div>
+                      <p className="mt-1 text-[#D2DDD6]">{scanResult.visibleCondition}</p>
+                      <div className="mt-3 font-semibold text-[#93C9A3]">Observations</div>
+                      <ul className="mt-1 space-y-1 text-[#D2DDD6] list-disc pl-4">
+                        {scanResult.observations.map((obs) => (
+                          <li key={obs}>{obs}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-xl border border-[#A9B78D]/15 bg-[#172620] p-4">
+                      <div className="font-semibold text-[#93C9A3]">Possible Reuse Applications</div>
+                      <ul className="mt-1 space-y-1 text-[#D2DDD6] list-disc pl-4">
+                        {scanResult.reuseApplications.map((app) => (
+                          <li key={app}>{app}</li>
+                        ))}
+                      </ul>
+                      <div className="mt-3 font-semibold text-[#93C9A3]">Quality Verification Checklist</div>
+                      <ul className="mt-1 space-y-1 text-[#D2DDD6]">
+                        {scanResult.qualityChecklist.map((chk) => (
+                          <li key={chk} className="flex items-start gap-1.5">
+                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#93C9A3]" />
+                            <span>{chk}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Editable Suggested Material Draft */}
+                  <div className="border-t border-[#A9B78D]/15 pt-5 space-y-3">
+                    <h3 className="font-display text-lg font-semibold text-[#F4F7F4]">
+                      Review & Edit Material / Object Listing Draft
+                    </h3>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-[#D2DDD6]">Title</label>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#D2DDD6]">Category</label>
+                        <select
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
                         >
-                          {app}
-                        </span>
-                      ))}
+                          {materialCategories.map((c) => (
+                            <option key={c.id} value={c.name}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#D2DDD6]">
+                          Indicative Price (₹ INR)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={editPriceInr}
+                          onChange={(e) => setEditPriceInr(e.target.value)}
+                          placeholder="0 = Free"
+                          className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] tabular-nums focus-ring"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#D2DDD6]">Description</label>
+                      <textarea
+                        rows={2}
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                      />
                     </div>
                   </div>
-                )}
 
-                {materialScanResult.qualityChecklist.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      Quality & Handover Checklist
-                    </h4>
-                    <ul className="mt-2 space-y-1.5 text-xs text-[#D2DDD6] list-disc pl-5">
-                      {materialScanResult.qualityChecklist.map((chk) => (
-                        <li key={chk}>{chk}</li>
-                      ))}
-                    </ul>
+                  <div className="rounded-lg border border-[#D99B38]/35 bg-[#2E230F] px-3.5 py-2.5 text-xs text-[#FAD089]">
+                    {scanResult.disclaimer}
                   </div>
-                )}
 
-                <div className="rounded-lg border border-[#D99B38]/35 bg-[#2E230F] px-3.5 py-2.5 text-xs text-[#FAD089]">
-                  {materialScanResult.disclaimer}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onCreateListingFromScan({
+                          title: editTitle,
+                          category: editCategory,
+                          description: editDescription,
+                          condition: 'Good',
+                          indicativePrice: editPriceInr.trim() ? Number(editPriceInr) : null,
+                          reuseApplications: scanResult.reuseApplications,
+                          imageUrl: imageDataUrl ?? undefined,
+                        })
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer"
+                    >
+                      <span>Create Marketplace Listing</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleCreateMaterialFromScan}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer"
-                  >
-                    <span>Create Material Listing from Scan</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
+              )
+            ) : !foodScanResult ? (
+              <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-10 text-center">
+                <Utensils className="h-8 w-8 text-[#93C9A3]" />
+                <h3 className="mt-3 font-display text-xl font-semibold text-[#F4F7F4]">
+                  Ready to Create a Food Rescue Donation Listing
+                </h3>
+                <p className="mt-2 max-w-md text-sm text-[#C8D6CD]">
+                  Upload a food photo or describe your surplus meal batch, bakery goods, or produce.
+                  AI will structure portions, storage instructions, allergens, and pre-fill your Food
+                  Rescue form.
+                </p>
               </div>
-            ) : foodScanResult ? (
-              <div className="rounded-2xl border border-[#93C9A3]/30 bg-[#111C17] p-6 space-y-5">
+            ) : (
+              <div className="rounded-2xl border border-[#93C9A3]/25 bg-[#111C17] p-6 space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#A9B78D]/15 pb-4">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Surplus Food AI Scan Complete</span>
+                    <div className="text-xs text-[#9BB0A3]">
+                      {foodScanResult.isDemoFallback
+                        ? 'Offline Draft Mode (No live API key configured)'
+                        : 'Gemini Food Rescue Assessment'}{' '}
+                      · {foodScanResult.confidenceLabel}
                     </div>
-                    <h3 className="mt-1.5 font-display text-2xl font-semibold text-[#F4F7F4]">
+                    <h2 className="mt-1 font-display text-2xl font-semibold text-[#F4F7F4]">
                       {foodScanResult.predictedFood}
-                    </h3>
+                    </h2>
                   </div>
-                  <div className="text-right">
-                    <span className="inline-block rounded-lg border border-[#93C9A3]/30 bg-[#172620] px-2.5 py-1 text-xs font-semibold text-[#93C9A3]">
-                      {foodScanResult.confidenceLabel}
-                      {foodScanResult.confidenceScore !== null
-                        ? ` · ${Math.round(foodScanResult.confidenceScore)}%`
-                        : ''}
-                    </span>
-                    <div className="mt-1 text-[11px] text-[#9BB0A3]">
-                      {foodScanResult.isDemoFallback ? 'Offline Analysis Mode' : 'Gemini Vision'}
-                    </div>
+                  <div className="text-right text-xs">
+                    <div className="text-[#9BB0A3]">Suggested Food Category</div>
+                    <div className="font-semibold text-[#93C9A3]">{foodScanResult.suggestedCategory}</div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3">
-                    <div className="text-[11px] text-[#9BB0A3]">Category</div>
-                    <div className="mt-1 text-xs font-semibold text-[#F4F7F4]">
-                      {foodScanResult.suggestedCategory}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3">
-                    <div className="text-[11px] text-[#9BB0A3]">Est. Quantity</div>
-                    <div className="mt-1 text-xs font-semibold tabular-nums text-[#F4F7F4]">
-                      {foodScanResult.estimatedQuantity} {foodScanResult.estimatedUnit}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3">
-                    <div className="text-[11px] text-[#9BB0A3]">Est. Portions</div>
-                    <div className="mt-1 text-xs font-semibold tabular-nums text-[#93C9A3]">
-                      ~{foodScanResult.estimatedPortions} portions
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3">
-                    <div className="text-[11px] text-[#9BB0A3]">Dietary</div>
-                    <div className="mt-1 text-xs font-semibold text-[#F4F7F4]">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 text-xs">
+                  <div className="rounded-xl border border-[#A9B78D]/15 bg-[#172620] p-4 space-y-2">
+                    <div className="font-semibold text-[#93C9A3]">Estimated Batch & Dietary</div>
+                    <p className="text-[#D2DDD6]">
+                      Approx. <strong className="text-white">{foodScanResult.estimatedPortions} portions</strong> (
+                      {foodScanResult.estimatedQuantity} {foodScanResult.estimatedUnit}) ·{' '}
                       {foodScanResult.dietaryTags}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-4 space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                    Suggested Food Donation Draft
-                  </div>
-                  <div className="text-sm font-semibold text-[#F4F7F4]">
-                    {foodScanResult.suggestedTitle}
-                  </div>
-                  <p className="text-xs leading-relaxed text-[#D2DDD6]">
-                    {foodScanResult.suggestedDescription}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3.5">
-                    <div className="font-semibold text-[#93C9A3]">Storage Advice</div>
-                    <p className="mt-1 text-[#D2DDD6]">{foodScanResult.storageAdvice}</p>
-                  </div>
-                  <div className="rounded-xl border border-[#A9B78D]/18 bg-[#0D1612] p-3.5">
-                    <div className="font-semibold text-[#93C9A3]">Packaging Advice</div>
-                    <p className="mt-1 text-[#D2DDD6]">{foodScanResult.packagingAdvice}</p>
-                  </div>
-                  <div className="rounded-xl border border-[#D99B38]/30 bg-[#2E230F]/70 p-3.5">
-                    <div className="font-semibold text-[#FAD089]">Potential Allergens</div>
-                    <p className="mt-1 text-[#FAD089]">{foodScanResult.potentialAllergens}</p>
-                  </div>
-                </div>
-
-                {foodScanResult.observations.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      Observations
-                    </h4>
-                    <ul className="mt-2 space-y-1.5 text-xs text-[#D2DDD6] list-disc pl-5">
+                    </p>
+                    <div className="font-semibold text-[#93C9A3] pt-1">Observations</div>
+                    <ul className="space-y-1 text-[#D2DDD6] list-disc pl-4">
                       {foodScanResult.observations.map((obs) => (
                         <li key={obs}>{obs}</li>
                       ))}
                     </ul>
                   </div>
-                )}
-
-                {foodScanResult.handlingChecklist.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
-                      Safe Handling Checklist
-                    </h4>
-                    <ul className="mt-2 space-y-1.5 text-xs text-[#D2DDD6] list-disc pl-5">
+                  <div className="rounded-xl border border-[#A9B78D]/15 bg-[#172620] p-4">
+                    <div className="font-semibold text-[#93C9A3]">Handling & Disclosure Checklist</div>
+                    <ul className="mt-1.5 space-y-1.5 text-[#D2DDD6]">
                       {foodScanResult.handlingChecklist.map((chk) => (
-                        <li key={chk}>{chk}</li>
+                        <li key={chk} className="flex items-start gap-1.5">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#93C9A3]" />
+                          <span>{chk}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
-                )}
+                </div>
+
+                {/* Editable Food Donation Draft */}
+                <div className="border-t border-[#A9B78D]/15 pt-5 space-y-3">
+                  <h3 className="font-display text-lg font-semibold text-[#F4F7F4]">
+                    Review & Edit Food Donation Draft
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-[#D2DDD6]">Food Title</label>
+                      <input
+                        type="text"
+                        value={editFoodTitle}
+                        onChange={(e) => setEditFoodTitle(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#D2DDD6]">Category</label>
+                      <select
+                        value={editFoodCategory}
+                        onChange={(e) => setEditFoodCategory(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                      >
+                        {foodCategories.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#D2DDD6]">Portions</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={editFoodPortions}
+                        onChange={(e) => setEditFoodPortions(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] tabular-nums focus-ring"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#D2DDD6]">
+                        Storage Conditions
+                      </label>
+                      <input
+                        type="text"
+                        value={editFoodStorage}
+                        onChange={(e) => setEditFoodStorage(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#D2DDD6]">
+                        Known Allergens
+                      </label>
+                      <input
+                        type="text"
+                        value={editFoodAllergens}
+                        onChange={(e) => setEditFoodAllergens(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#D2DDD6]">Description</label>
+                    <textarea
+                      rows={2}
+                      value={editFoodDescription}
+                      onChange={(e) => setEditFoodDescription(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                    />
+                  </div>
+                </div>
 
                 <div className="rounded-lg border border-[#D99B38]/35 bg-[#2E230F] px-3.5 py-2.5 text-xs text-[#FAD089]">
                   {foodScanResult.disclaimer}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={handleCreateFoodFromScan}
+                    onClick={() =>
+                      onCreateFoodDonationFromAI({
+                        title: editFoodTitle,
+                        category: editFoodCategory,
+                        description: editFoodDescription,
+                        quantity: foodScanResult.estimatedQuantity,
+                        unit: foodScanResult.estimatedUnit,
+                        portions: Math.max(1, Math.round(Number(editFoodPortions) || foodScanResult.estimatedPortions)),
+                        storageInfo: editFoodStorage,
+                        packagingInfo: foodScanResult.packagingAdvice,
+                        allergens: editFoodAllergens,
+                        dietaryInfo: foodScanResult.dietaryTags,
+                        imageUrl: imageDataUrl ?? 'media:bakery',
+                      })
+                    }
                     className="inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer"
                   >
-                    <span>Create Food Donation from Scan</span>
+                    <span>Create Food Donation Listing</span>
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
-      )}
-
-      {/* SECTION 1: AI LISTING VERIFICATION & PUBLISHING */}
-      {section === 'verify' && (
-        <AIListingVerifier
-          initialType={initialVerifyType}
-          prefillDraft={verifierPrefill}
-          user={user}
-          categories={categories}
-          onRequireAuth={onRequireAuth}
-          onPublished={onPublished}
-          onToast={onToast}
-        />
       )}
 
       {/* SECTION 2: SMART MATCHMAKING & AI GUIDE (FOOD OR REUSABLE OBJECT) */}
@@ -1128,25 +1195,20 @@ export function AILabView({
               ) : (
                 matchResults.map(({ listing, relevanceScore, reasons, quantityCompatibility }) => {
                   const waUrl = buildWhatsAppUrl(listing.whatsappNumber, 'material', listing.title);
-                  const imgSrc = resolveImageSrc(listing.imageUrl);
                   return (
                     <article
                       key={listing.id}
-                      className={`grid grid-cols-1 overflow-hidden rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] ${
-                        imgSrc ? 'sm:grid-cols-4' : ''
-                      }`}
+                      className="grid grid-cols-1 overflow-hidden rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] sm:grid-cols-4"
                     >
-                      {imgSrc && (
-                        <div className="aspect-[4/3] sm:aspect-auto bg-[#0D1612]">
-                          <img
-                            src={imgSrc}
-                            alt={listing.title}
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className={`flex flex-col justify-between p-5 ${imgSrc ? 'sm:col-span-3' : ''}`}>
+                      <div className="aspect-[4/3] sm:aspect-auto bg-[#0D1612]">
+                        <img
+                          src={resolveImageSrc(listing.imageUrl, 'aluminium')}
+                          alt={listing.title}
+                          referrerPolicy="no-referrer"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="flex flex-col justify-between p-5 sm:col-span-3">
                         <div>
                           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                             <span className="text-[#9BB0A3]">
@@ -1203,25 +1265,20 @@ export function AILabView({
             ) : (
               foodMatchResults.map(({ donation, relevanceScore, reasons, portionCompatibility }) => {
                 const waUrl = buildWhatsAppUrl(donation.whatsappNumber, 'food', donation.title);
-                const imgSrc = resolveImageSrc(donation.imageUrl);
                 return (
                   <article
                     key={donation.id}
-                    className={`grid grid-cols-1 overflow-hidden rounded-2xl border border-[#93C9A3]/25 bg-[#111C17] ${
-                      imgSrc ? 'sm:grid-cols-4' : ''
-                    }`}
+                    className="grid grid-cols-1 overflow-hidden rounded-2xl border border-[#93C9A3]/25 bg-[#111C17] sm:grid-cols-4"
                   >
-                    {imgSrc && (
-                      <div className="aspect-[4/3] sm:aspect-auto bg-[#0D1612]">
-                        <img
-                          src={imgSrc}
-                          alt={donation.title}
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className={`flex flex-col justify-between p-5 ${imgSrc ? 'sm:col-span-3' : ''}`}>
+                    <div className="aspect-[4/3] sm:aspect-auto bg-[#0D1612]">
+                      <img
+                        src={resolveImageSrc(donation.imageUrl, 'bakery')}
+                        alt={donation.title}
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-between p-5 sm:col-span-3">
                       <div>
                         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                           <span className="text-[#9BB0A3]">

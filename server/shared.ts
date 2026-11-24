@@ -223,8 +223,6 @@ export function mapMaterialListing(row: Record<string, unknown>) {
     isHidden: Boolean(row.is_hidden),
     hiddenReason: row.hidden_reason ? String(row.hidden_reason) : null,
     isDemo: Boolean(row.is_demo),
-    verificationId: row.verification_id ? String(row.verification_id) : null,
-    aiVerificationStatus: row.ai_verification_status ? String(row.ai_verification_status) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -259,8 +257,6 @@ export function mapFoodDonation(row: Record<string, unknown>) {
     isHidden: Boolean(row.is_hidden),
     hiddenReason: row.hidden_reason ? String(row.hidden_reason) : null,
     isDemo: Boolean(row.is_demo),
-    verificationId: row.verification_id ? String(row.verification_id) : null,
-    aiVerificationStatus: row.ai_verification_status ? String(row.ai_verification_status) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -285,8 +281,6 @@ export function mapOilListing(row: Record<string, unknown>) {
     whatsappNumber: row.whatsapp_number ? String(row.whatsapp_number) : null,
     isHidden: Boolean(row.is_hidden),
     hiddenReason: row.hidden_reason ? String(row.hidden_reason) : null,
-    verificationId: row.verification_id ? String(row.verification_id) : null,
-    aiVerificationStatus: row.ai_verification_status ? String(row.ai_verification_status) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };

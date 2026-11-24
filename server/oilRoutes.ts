@@ -2,13 +2,8 @@ import { Express } from 'express';
 import { createId, db } from './db.ts';
 import {
   fetchPublicOilListingsFromFirestore,
-  invalidatePublicSyncCache,
   mergeWithRemoteById,
 } from './firestorePublicSync.ts';
-import {
-  markVerificationPublished,
-  validateAndLockListingVerification,
-} from './listingVerification.ts';
 import {
   addNotification,
   AuthedRequest,
@@ -74,72 +69,35 @@ export function registerOilRoutes(app: Express) {
     }
 
     const u = req.user!;
-    const verificationCheck = validateAndLockListingVerification({
-      verificationId: b.verificationId,
-      userId: u.id,
-      listingType: 'oil',
-      candidatePayload: {
-        title: b.title.trim(),
-        oilType: b.oilType.trim(),
-        volumeLiters: liters,
-        qualityGrade: b.qualityGrade.trim(),
-        containerType: b.containerType.trim(),
-        filtrationStatus: b.filtrationStatus.trim(),
-        pickupWindow: b.pickupWindow.trim(),
-        location: b.location.trim(),
-      },
-    });
-    if (!verificationCheck.ok) {
-      res.status(verificationCheck.statusCode).json({ error: verificationCheck.error });
-      return;
-    }
-
     const id = createId('oil');
     const now = new Date().toISOString();
     const whatsapp = normalizePhoneOrNull(b.whatsappNumber) ?? u.whatsapp_number;
 
-    db.exec('BEGIN IMMEDIATE');
-    try {
-      db.prepare(
-        `INSERT INTO oil_recovery_listings (
-          id, supplier_id, supplier_name, supplier_organization, supplier_verified,
-          title, oil_type, volume_liters, quality_grade, container_type, filtration_status,
-          pickup_window, location, collection_status, whatsapp_number, is_hidden,
-          verification_id, ai_verification_status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?, 0, ?, ?, ?, ?)`
-      ).run(
-        id,
-        u.id,
-        u.name,
-        u.organization,
-        u.verification_status === 'Approved' ? 1 : 0,
-        b.title.trim().slice(0, 120),
-        b.oilType.trim().slice(0, 80),
-        liters,
-        b.qualityGrade.trim().slice(0, 60),
-        b.containerType.trim().slice(0, 80),
-        b.filtrationStatus.trim().slice(0, 80),
-        b.pickupWindow.trim().slice(0, 140),
-        b.location.trim().slice(0, 120),
-        whatsapp,
-        verificationCheck.verificationId,
-        verificationCheck.aiStatus,
-        now,
-        now
-      );
-      markVerificationPublished(verificationCheck.verificationId, id);
-      db.exec('COMMIT');
-    } catch (err) {
-      try {
-        db.exec('ROLLBACK');
-      } catch {
-        /* ignore */
-      }
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to publish oil lot.' });
-      return;
-    }
+    db.prepare(
+      `INSERT INTO oil_recovery_listings (
+        id, supplier_id, supplier_name, supplier_organization, supplier_verified,
+        title, oil_type, volume_liters, quality_grade, container_type, filtration_status,
+        pickup_window, location, collection_status, whatsapp_number, is_hidden, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?, 0, ?, ?)`
+    ).run(
+      id,
+      u.id,
+      u.name,
+      u.organization,
+      u.verification_status === 'Approved' ? 1 : 0,
+      b.title.trim().slice(0, 120),
+      b.oilType.trim().slice(0, 80),
+      liters,
+      b.qualityGrade.trim().slice(0, 60),
+      b.containerType.trim().slice(0, 80),
+      b.filtrationStatus.trim().slice(0, 80),
+      b.pickupWindow.trim().slice(0, 140),
+      b.location.trim().slice(0, 120),
+      whatsapp,
+      now,
+      now
+    );
 
-    invalidatePublicSyncCache('oil_recovery_listings');
     touchUserActivity(u.id);
     const created = db.prepare('SELECT * FROM oil_recovery_listings WHERE id = ?').get(id) as Record<string, unknown>;
     res.status(201).json({ listing: mapOilListing(created) });
@@ -181,7 +139,6 @@ export function registerOilRoutes(app: Express) {
       );
     }
 
-    invalidatePublicSyncCache('oil_recovery_listings');
     const updated = db.prepare('SELECT * FROM oil_recovery_listings WHERE id = ?').get(req.params.id) as Record<string, unknown>;
     res.json({ listing: mapOilListing(updated) });
   });
@@ -410,7 +367,6 @@ export function registerOilRoutes(app: Express) {
       );
 
       db.exec('COMMIT');
-      invalidatePublicSyncCache('oil_recovery_listings');
       res.json({ ok: true, status });
     } catch (err) {
       try {

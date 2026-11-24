@@ -5,8 +5,6 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 
-import zlib from 'node:zlib';
-
 const TEST_DB = path.resolve(process.cwd(), 'data/verdora_test.db');
 const TEST_PORT = 3201;
 const MOCK_CERTS_PORT = 3204;
@@ -14,55 +12,6 @@ const TEST_BASE = `http://127.0.0.1:${TEST_PORT}`;
 const MOCK_CERTS_URL = `http://127.0.0.1:${MOCK_CERTS_PORT}/certs`;
 const LIVE_BASE = 'http://127.0.0.1:3000';
 const FIREBASE_PROJECT_ID = 'conductive-tesla-1c70r';
-
-function makeSamplePng(seed: number): string {
-  const width = 48;
-  const height = 48;
-  const raw = Buffer.alloc(height * (1 + width * 3));
-  let x = (seed * 2654435761) >>> 0;
-  for (let y = 0; y < height; y++) {
-    const rowStart = y * (1 + width * 3);
-    raw[rowStart] = 0;
-    for (let col = 0; col < width; col++) {
-      x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
-      raw[rowStart + 1 + col * 3] = (x >>> 16) & 0xff;
-      raw[rowStart + 1 + col * 3 + 1] = (x >>> 8) & 0xff;
-      raw[rowStart + 1 + col * 3 + 2] = x & 0xff;
-    }
-  }
-  const crcTable = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    crcTable[n] = c >>> 0;
-  }
-  const crc32 = (buf: Buffer) => {
-    let c = 0xffffffff;
-    for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  };
-  const chunk = (type: string, data: Buffer) => {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length, 0);
-    const typeBuf = Buffer.from(type, 'ascii');
-    const crcBuf = Buffer.alloc(4);
-    crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-    return Buffer.concat([len, typeBuf, data, crcBuf]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 2;
-  const idat = zlib.deflateSync(raw);
-  const png = Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-  return `data:image/png;base64,${png.toString('base64')}`;
-}
 
 function cleanupTestDb() {
   for (const suffix of ['', '-wal', '-shm']) {
@@ -179,30 +128,17 @@ async function runLiveProductionCheck() {
   assert.equal(authStatus.data.configured, true, 'Live Firebase Google auth must be configured');
   assert.equal(authStatus.data.provider, 'firebase-google');
 
-  const adminPage = await fetch(`${LIVE_BASE}/admin`);
-  assert.equal(adminPage.status, 200, 'Direct /admin URL must serve the SPA');
-
-  const leaderboardRemoved = await apiJson(LIVE_BASE, '/api/leaderboard');
-  assert.equal(leaderboardRemoved.status, 404, 'Leaderboard endpoint must be removed');
-
-  const mat = await apiJson<{ listings: Array<{ isDemo?: boolean }> }>(LIVE_BASE, '/api/materials');
+  const mat = await apiJson<{ listings: unknown[] }>(LIVE_BASE, '/api/materials');
   assert.equal(mat.status, 200);
-  assert.equal(
-    mat.data.listings.filter((l) => l.isDemo).length,
-    0,
-    'Live DB must have 0 demo/fake material listings'
-  );
+  assert.equal(mat.data.listings.length, 0, 'Live DB must have 0 fake material listings');
 
-  const food = await apiJson<{ donations: Array<{ isDemo?: boolean }> }>(LIVE_BASE, '/api/food-donations');
+  const food = await apiJson<{ donations: unknown[] }>(LIVE_BASE, '/api/food-donations');
   assert.equal(food.status, 200);
-  assert.equal(
-    food.data.donations.filter((d) => d.isDemo).length,
-    0,
-    'Live DB must have 0 demo/fake food donations'
-  );
+  assert.equal(food.data.donations.length, 0, 'Live DB must have 0 fake food donations');
 
   const oil = await apiJson<{ listings: unknown[] }>(LIVE_BASE, '/api/oil-recovery');
   assert.equal(oil.status, 200);
+  assert.equal(oil.data.listings.length, 0, 'Live DB must have 0 fake oil listings');
 
   const imp = await apiJson<{
     live: {
@@ -213,9 +149,10 @@ async function runLiveProductionCheck() {
     };
   }>(LIVE_BASE, '/api/impact');
   assert.equal(imp.status, 200);
-  assert.equal(typeof imp.data.live.materialsRecoveredKg, 'number');
-  assert.equal(typeof imp.data.live.foodPortionsRescued, 'number');
-  assert.equal(typeof imp.data.live.oilLitersRecovered, 'number');
+  assert.equal(imp.data.live.materialsRecoveredKg, 0);
+  assert.equal(imp.data.live.foodPortionsRescued, 0);
+  assert.equal(imp.data.live.oilLitersRecovered, 0);
+  assert.equal(imp.data.live.communityParticipants, 0);
 
   const demoLogin = await apiJson(LIVE_BASE, '/api/auth/demo-login', { method: 'POST', body: {} });
   assert.equal(demoLogin.status, 404, 'Legacy demo-login endpoint must be removed');
@@ -250,7 +187,6 @@ async function runIsolatedEndToEndSuite() {
       VERDORA_ADMIN_EMAIL: adminEmail,
       VERDORA_ADMIN_NAME: 'Platform Operator',
       VERDORA_FIREBASE_CERTS_URL: MOCK_CERTS_URL,
-      GEMINI_API_KEY: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -429,64 +365,24 @@ async function runIsolatedEndToEndSuite() {
     assert.equal(buyerRelogin.user.id, buyerReg.user.id);
     const buyerToken = buyerRelogin.token;
 
-    const verifyListing = async (
-      token: string,
-      listingType: 'material' | 'food' | 'oil',
-      payload: Record<string, unknown>
-    ) => {
-      const res = await apiJson<{ verification: { id: string; status: string } }>(
-        TEST_BASE,
-        '/api/ai/verify-listing',
-        { method: 'POST', token, body: { listingType, payload } }
-      );
-      assert.equal(res.status, 201, `AI verify failed for ${listingType}`);
-      assert.equal(res.data.verification.status, 'VERIFIED', `Expected VERIFIED for ${listingType}`);
-      return res.data.verification.id;
-    };
-
-    // Supplier publishes material listing via AI verification -> Buyer places request -> Completed
-    const matPayload = {
-      title: 'Clean 6061 Aluminium Plates',
-      category: 'Aluminium',
-      description: 'Laser-cut plate offcuts stored dry on warehouse pallets ready for workshop brackets.',
-      quantity: 80,
-      unit: 'kg',
-      condition: 'Unused Surplus',
-      location: 'Austin',
-      availableUntil: new Date(Date.now() + 7 * 86400_000).toISOString(),
-      pickupPreferences: 'Weekday dock',
-      imageUrl: makeSamplePng(11),
-    };
-    const matVerId = await verifyListing(supplierReg.token, 'material', matPayload);
+    // Supplier publishes material listing -> Buyer places request -> Completed
     const createMat = await apiJson<{ listing: { id: string } }>(TEST_BASE, '/api/materials', {
       method: 'POST',
       token: supplierReg.token,
-      body: { ...matPayload, verificationId: matVerId },
+      body: {
+        title: 'Clean 6061 Aluminium Plates',
+        category: 'Aluminium',
+        description: 'Laser-cut plate offcuts ready for workshop brackets.',
+        quantity: 80,
+        unit: 'kg',
+        condition: 'Unused Surplus',
+        location: 'Austin',
+        availableUntil: new Date(Date.now() + 7 * 86400_000).toISOString(),
+        pickupPreferences: 'Weekday dock',
+      },
     });
     assert.equal(createMat.status, 201);
     const matId = createMat.data.listing.id;
-
-    // Second active listing to test Admin hide/unhide while first listing becomes Completed
-    const matPayload2 = {
-      title: 'Brushed Stainless Steel Strips',
-      category: 'Steel',
-      description: 'Clean 304 stainless steel fabrication strips bundled neatly for industrial reuse.',
-      quantity: 50,
-      unit: 'kg',
-      condition: 'Good',
-      location: 'Austin',
-      availableUntil: new Date(Date.now() + 10 * 86400_000).toISOString(),
-      pickupPreferences: 'Weekday dock',
-      imageUrl: makeSamplePng(12),
-    };
-    const matVerId2 = await verifyListing(supplierReg.token, 'material', matPayload2);
-    const createMat2 = await apiJson<{ listing: { id: string } }>(TEST_BASE, '/api/materials', {
-      method: 'POST',
-      token: supplierReg.token,
-      body: { ...matPayload2, verificationId: matVerId2 },
-    });
-    assert.equal(createMat2.status, 201);
-    const activeMatId = createMat2.data.listing.id;
 
     const createMatReq = await apiJson<{ id: string }>(TEST_BASE, '/api/material-requests', {
       method: 'POST',
@@ -513,29 +409,26 @@ async function runIsolatedEndToEndSuite() {
       body: { status: 'Completed' },
     });
 
-    // Restaurant posts food donation via AI verification -> Recipient requests -> Completed
-    const foodPayload = {
-      title: 'Fresh Vegetable Rice Trays',
-      category: 'Prepared meals',
-      description: 'Prepared midday, held hot in sealed gastronorm trays ready for immediate rescue.',
-      quantity: 10,
-      unit: 'kg',
-      portions: 24,
-      pickupDeadline: new Date(Date.now() + 4 * 3600_000).toISOString(),
-      storageInfo: 'Hot-held above 63C',
-      packagingInfo: 'Sealed steel trays',
-      allergens: 'None',
-      location: 'Austin',
-      imageUrl: makeSamplePng(13),
-    };
-    const foodVerId = await verifyListing(restaurantReg.token, 'food', foodPayload);
+    // Restaurant posts food donation -> Recipient requests -> Completed
     const createFood = await apiJson<{ donation: { id: string } }>(
       TEST_BASE,
       '/api/food-donations',
       {
         method: 'POST',
         token: restaurantReg.token,
-        body: { ...foodPayload, verificationId: foodVerId },
+        body: {
+          title: 'Fresh Vegetable Rice Trays',
+          category: 'Prepared meals',
+          description: 'Prepared midday, held hot in sealed gastronorm trays.',
+          quantity: 10,
+          unit: 'kg',
+          portions: 24,
+          pickupDeadline: new Date(Date.now() + 4 * 3600_000).toISOString(),
+          storageInfo: 'Hot-held above 63C',
+          packagingInfo: 'Sealed steel trays',
+          allergens: 'None',
+          location: 'Austin',
+        },
       }
     );
     assert.equal(createFood.status, 201);
@@ -586,22 +479,20 @@ async function runIsolatedEndToEndSuite() {
     assert.equal(verApprove.status, 200);
     assert.equal(verApprove.data.status, 'Approved');
 
-    // Verified restaurant publishes Used Cooking Oil lot via AI verification -> Industrial Buyer enquires -> Completed
-    const oilPayload = {
-      title: 'Filtered Sunflower Frying Oil Tote',
-      oilType: 'Sunflower Oil',
-      volumeLiters: 180,
-      qualityGrade: 'Grade A - Filtered',
-      containerType: 'Sealed 200L Drum',
-      filtrationStatus: 'Filtered 100 micron',
-      pickupWindow: 'Mon-Fri 08:00-11:00',
-      location: 'Austin',
-    };
-    const oilVerId = await verifyListing(restaurantReg.token, 'oil', oilPayload);
+    // Verified restaurant publishes Used Cooking Oil lot -> Industrial Buyer enquires -> Completed
     const createOil = await apiJson<{ listing: { id: string } }>(TEST_BASE, '/api/oil-recovery', {
       method: 'POST',
       token: restaurantReg.token,
-      body: { ...oilPayload, verificationId: oilVerId },
+      body: {
+        title: 'Filtered Sunflower Frying Oil Tote',
+        oilType: 'Sunflower Oil',
+        volumeLiters: 180,
+        qualityGrade: 'Grade A - Filtered',
+        containerType: 'Sealed 200L Drum',
+        filtrationStatus: 'Filtered 100 micron',
+        pickupWindow: 'Mon-Fri 08:00-11:00',
+        location: 'Austin',
+      },
     });
     assert.equal(createOil.status, 201);
 
@@ -723,8 +614,8 @@ async function runIsolatedEndToEndSuite() {
     });
     assert.equal(suspendedLogin.status, 403, 'Suspended user must be blocked from Google login');
 
-    // Completed listing is already hidden from public materials; admin hides/unhides activeMatId
-    await apiJson(TEST_BASE, `/api/admin/listings/${activeMatId}`, {
+    // Admin hides listing -> disappears from public materials -> admin unhides -> returns
+    await apiJson(TEST_BASE, `/api/admin/listings/${matId}`, {
       method: 'PATCH',
       token: adminToken,
       body: { isHidden: true, reason: 'Temporary spec check' },
@@ -732,7 +623,7 @@ async function runIsolatedEndToEndSuite() {
     const publicMatsHidden = await apiJson<{ listings: unknown[] }>(TEST_BASE, '/api/materials');
     assert.equal(publicMatsHidden.data.listings.length, 0);
 
-    await apiJson(TEST_BASE, `/api/admin/listings/${activeMatId}`, {
+    await apiJson(TEST_BASE, `/api/admin/listings/${matId}`, {
       method: 'PATCH',
       token: adminToken,
       body: { isHidden: false, status: 'Active' },

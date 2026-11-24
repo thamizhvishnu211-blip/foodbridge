@@ -5,10 +5,10 @@ import { api } from '../services/api';
 import {
   createOilEnquiryInFirestore,
   isOwnerOfResource,
+  syncOilListingToFirestore,
 } from '../services/firestoreSync';
-import type { ListingKind, OilRecoveryListing, User } from '../types';
+import type { OilRecoveryListing, User } from '../types';
 import { buildWhatsAppUrl, formatShortDate } from '../utils/format';
-import { AIVerifyGateModal } from './AIVerifyGateModal';
 import { ReportModal } from './ReportModal';
 
 interface OilRecoveryViewProps {
@@ -17,7 +17,6 @@ interface OilRecoveryViewProps {
   onRefresh: () => Promise<void>;
   onRequireAuth: () => void;
   onToast: (msg: string) => void;
-  onGoToAIVerifier: (kind: ListingKind) => void;
 }
 
 export function OilRecoveryView({
@@ -26,15 +25,27 @@ export function OilRecoveryView({
   onRefresh,
   onRequireAuth,
   onToast,
-  onGoToAIVerifier,
 }: OilRecoveryViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('');
 
   const [selectedLot, setSelectedLot] = useState<OilRecoveryListing | null>(null);
-  const [showAIGateModal, setShowAIGateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ type: 'oil'; id: string; title: string } | null>(null);
+
+  // Create form
+  const [title, setTitle] = useState('');
+  const [oilType, setOilType] = useState('Used Cooking Oil (Sunflower / Vegetable)');
+  const [volumeLiters, setVolumeLiters] = useState('120');
+  const [qualityGrade, setQualityGrade] = useState('Filtered Commercial Grade');
+  const [containerType, setContainerType] = useState('Sealed HDPE 200L Drum');
+  const [filtrationStatus, setFiltrationStatus] = useState('Settled & Mesh-Filtered');
+  const [pickupWindow, setPickupWindow] = useState('Weekdays 08:00–16:00 (Rear service dock)');
+  const [location, setLocation] = useState(user?.location || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(user?.whatsappNumber ?? '');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Enquiry form
   const [reqLiters, setReqLiters] = useState('100');
@@ -50,13 +61,7 @@ export function OilRecoveryView({
     const q = searchQuery.trim().toLowerCase();
     const loc = locationFilter.trim().toLowerCase();
     return listings.filter((item) => {
-      if (statusFilter === 'All') {
-        if (item.collectionStatus === 'Processed' || item.collectionStatus === 'Cancelled') {
-          return false;
-        }
-      } else if (item.collectionStatus !== statusFilter) {
-        return false;
-      }
+      if (statusFilter !== 'All' && item.collectionStatus !== statusFilter) return false;
       if (loc && !item.location.toLowerCase().includes(loc)) return false;
       if (q) {
         const hay = `${item.title} ${item.oilType} ${item.supplierOrganization} ${item.location}`.toLowerCase();
@@ -65,6 +70,41 @@ export function OilRecoveryView({
       return true;
     });
   }, [listings, searchQuery, statusFilter, locationFilter]);
+
+  const handleCreate = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      onRequireAuth();
+      return;
+    }
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      const res = await api.createOilListing({
+        title,
+        oilType,
+        volumeLiters: Number(volumeLiters),
+        qualityGrade,
+        containerType,
+        filtrationStatus,
+        pickupWindow,
+        location,
+        whatsappNumber: whatsappNumber || null,
+      });
+      await syncOilListingToFirestore({
+        ...res.listing,
+        supplierUid: res.listing.supplierUid || auth.currentUser?.uid || user.firebaseUid || undefined,
+      }).catch(() => {});
+      setTitle('');
+      setShowCreateModal(false);
+      onToast('Used cooking oil lot published.');
+      await onRefresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to publish oil lot.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmitEnquiry = async (e: FormEvent) => {
     e.preventDefault();
@@ -143,11 +183,17 @@ export function OilRecoveryView({
         </div>
         <button
           type="button"
-          onClick={() => setShowAIGateModal(true)}
+          onClick={() => {
+            if (!user) {
+              onRequireAuth();
+              return;
+            }
+            setShowCreateModal(true);
+          }}
           className="inline-flex items-center gap-2 rounded-lg bg-[#2B7A58] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] self-start cursor-pointer"
         >
           <Plus className="h-4 w-4" />
-          <span>Add to List</span>
+          <span>List Used Cooking Oil Lot</span>
         </button>
       </div>
 
@@ -390,13 +436,149 @@ export function OilRecoveryView({
         </div>
       )}
 
-      {/* AI VERIFICATION GATE MODAL */}
-      <AIVerifyGateModal
-        isOpen={showAIGateModal}
-        listingType="oil"
-        onClose={() => setShowAIGateModal(false)}
-        onGoToAssistant={(kind) => onGoToAIVerifier(kind)}
-      />
+      {/* Create Oil Lot Modal */}
+      {showCreateModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#040806]/80 p-4 backdrop-blur-sm"
+        >
+          <div className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[#A9B78D]/25 bg-[#111C17] p-6 text-[#F4F7F4] shadow-2xl sm:p-7">
+            <button
+              type="button"
+              aria-label="Close publish oil lot modal"
+              onClick={() => setShowCreateModal(false)}
+              className="absolute right-4 top-4 rounded-lg p-2 text-[#C8D6CD] hover:bg-[#172620] hover:text-[#F4F7F4] cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="font-display text-2xl font-semibold text-[#F4F7F4]">
+              Publish Used Cooking Oil Lot
+            </h2>
+            <p className="mt-1 text-xs text-[#C8D6CD]">
+              List kitchen oil volume, filtration state, and container details for verified buyers.
+            </p>
+
+            {formError && (
+              <div className="mt-4 rounded-lg border border-[#E06C75]/35 bg-[#361619] px-3.5 py-2.5 text-xs text-[#FFB3B8]">
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreate} className="mt-5 space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-[#D2DDD6]">Lot Title</label>
+                <input
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., Filtered Kitchen Fryer Oil — 2 Drums"
+                  className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">Oil Type</label>
+                  <input
+                    type="text"
+                    required
+                    value={oilType}
+                    onChange={(e) => setOilType(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">Volume (Liters)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={volumeLiters}
+                    onChange={(e) => setVolumeLiters(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">Quality Grade</label>
+                  <input
+                    type="text"
+                    required
+                    value={qualityGrade}
+                    onChange={(e) => setQualityGrade(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">Container Type</label>
+                  <input
+                    type="text"
+                    required
+                    value={containerType}
+                    onChange={(e) => setContainerType(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">Filtration Status</label>
+                  <input
+                    type="text"
+                    required
+                    value={filtrationStatus}
+                    onChange={(e) => setFiltrationStatus(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">City / Location</label>
+                  <input
+                    type="text"
+                    required
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="City & neighborhood"
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">Pickup Window</label>
+                  <input
+                    type="text"
+                    required
+                    value={pickupWindow}
+                    onChange={(e) => setPickupWindow(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] focus-ring"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#D2DDD6]">WhatsApp Contact</label>
+                  <input
+                    type="tel"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    placeholder="+919876543210"
+                    className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-lg bg-[#2B7A58] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#348F68] disabled:opacity-60 cursor-pointer"
+              >
+                {submitting ? 'Publishing...' : 'Publish Oil Recovery Lot'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {reportTarget && (
         <ReportModal

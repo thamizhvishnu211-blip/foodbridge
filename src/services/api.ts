@@ -12,15 +12,13 @@ import type {
   FoodRequest,
   FoodScanResult,
   ImpactSummary,
-  ListingKind,
-  ListingVerificationRecord,
+  LeaderboardEntry,
   MaterialListing,
   MaterialRequest,
   MaterialScanResult,
   NotificationItem,
   OilBuyerEnquiry,
   OilRecoveryListing,
-  PersonalImpactSummary,
   ReportRecord,
   ResourceGuideResult,
   User,
@@ -102,6 +100,7 @@ export const api = {
     organization?: string;
     location?: string;
     whatsappNumber?: string | null;
+    publicLeaderboard?: boolean;
   }) =>
     request<{ user: User }>('/api/auth/profile', {
       method: 'PATCH',
@@ -448,44 +447,8 @@ export const api = {
   },
 
   getImpact: () => request<ImpactSummary>('/api/impact'),
-  getMyImpactSummary: () => request<PersonalImpactSummary>('/api/my/impact-summary'),
-
-  verifyListing: (payload: {
-    listingType: ListingKind;
-    payload: Record<string, unknown>;
-    evidenceNotes?: string;
-    evidenceImageUrl?: string | null;
-  }) =>
-    request<{ verification: ListingVerificationRecord; mode: 'live-gemini' | 'rule-engine' }>('/api/ai/verify-listing', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  requestVerificationHumanReview: (
-    id: string,
-    payload: { evidenceNotes?: string; evidenceImageUrl?: string | null }
-  ) =>
-    request<{ verification: ListingVerificationRecord }>(`/api/ai/verifications/${id}/request-review`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  getMyVerifications: () => request<{ verifications: ListingVerificationRecord[] }>('/api/ai/verifications/mine'),
-  adminGetAiVerifications: (params?: { status?: string; review?: string; q?: string }) => {
-    const sp = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v) sp.set(k, v);
-      });
-    }
-    const qs = sp.toString();
-    return request<{ verifications: ListingVerificationRecord[] }>(
-      `/api/admin/ai-verifications${qs ? `?${qs}` : ''}`
-    );
-  },
-  adminReviewAiVerification: (id: string, payload: { decision: 'approved' | 'rejected'; notes?: string }) =>
-    request<{ verification: ListingVerificationRecord }>(`/api/admin/ai-verifications/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    }),
+  getLeaderboard: (window: 'weekly' | 'monthly' | 'all') =>
+    request<{ entries: LeaderboardEntry[] }>(`/api/leaderboard?window=${window}`),
 
   scanMaterial: (imageDataUrl: string | null, contextText: string) =>
     request<MaterialScanResult>('/api/ai/scan-material', {

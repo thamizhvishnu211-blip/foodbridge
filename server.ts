@@ -23,15 +23,9 @@ import { registerOilRoutes } from './server/oilRoutes.ts';
 import { registerAdminRoutes } from './server/adminRoutes.ts';
 import { registerFirebaseAuthRoutes } from './server/firebaseAuth.ts';
 import {
-  markVerificationPublished,
-  registerListingVerificationRoutes,
-  validateAndLockListingVerification,
-} from './server/listingVerification.ts';
-import {
   fetchPublicFoodDonationsFromFirestore,
   fetchPublicMaterialsFromFirestore,
   fetchPublicOilListingsFromFirestore,
-  invalidatePublicSyncCache,
   mergeWithRemoteById,
 } from './server/firestorePublicSync.ts';
 import {
@@ -368,34 +362,6 @@ async function startServer() {
     }
 
     const u = req.user!;
-    const imageUrl =
-      typeof b.imageUrl === 'string' && b.imageUrl.trim() ? b.imageUrl.trim() : 'media:aluminium';
-    const price =
-      b.indicativePrice !== undefined && b.indicativePrice !== null && b.indicativePrice !== ''
-        ? Math.max(0, Number(b.indicativePrice))
-        : null;
-
-    const verificationCheck = validateAndLockListingVerification({
-      verificationId: b.verificationId,
-      userId: u.id,
-      listingType: 'material',
-      candidatePayload: {
-        title: b.title.trim(),
-        category: b.category.trim(),
-        description: b.description.trim(),
-        quantity: qty,
-        unit: b.unit.trim(),
-        condition: b.condition.trim(),
-        location: b.location.trim(),
-        indicativePrice: Number.isFinite(price as number) ? price : null,
-        imageUrl,
-      },
-    });
-    if (!verificationCheck.ok) {
-      res.status(verificationCheck.statusCode).json({ error: verificationCheck.error });
-      return;
-    }
-
     const id = createId('mat');
     const now = new Date().toISOString();
     const availableUntil =
@@ -409,57 +375,49 @@ async function startServer() {
         ? b.reuseApplications.split(',').map((s: string) => s.trim()).filter(Boolean).slice(0, 8)
         : [];
 
+    const price =
+      b.indicativePrice !== undefined && b.indicativePrice !== null && b.indicativePrice !== ''
+        ? Math.max(0, Number(b.indicativePrice))
+        : null;
+
+    const imageUrl =
+      typeof b.imageUrl === 'string' && b.imageUrl.trim() ? b.imageUrl.trim() : 'media:aluminium';
+
     const whatsapp =
       b.whatsappNumber !== undefined
         ? (normalizePhoneOrNull(b.whatsappNumber) ?? u.whatsapp_number)
         : u.whatsapp_number;
 
-    db.exec('BEGIN IMMEDIATE');
-    try {
-      db.prepare(
-        `INSERT INTO material_listings (
-          id, seller_id, seller_name, seller_organization, seller_verified, title, category,
-          description, quantity, unit, condition, location, indicative_price, currency,
-          image_url, available_until, pickup_preferences, reuse_applications, whatsapp_number,
-          status, is_hidden, is_demo, verification_id, ai_verification_status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, ?, ?, ?, 'Active', 0, 0, ?, ?, ?, ?)`
-      ).run(
-        id,
-        u.id,
-        u.name,
-        u.organization,
-        u.verification_status === 'Approved' ? 1 : 0,
-        b.title.trim().slice(0, 120),
-        b.category.trim(),
-        b.description.trim().slice(0, 1500),
-        qty,
-        b.unit.trim().slice(0, 24),
-        b.condition.trim(),
-        b.location.trim().slice(0, 120),
-        Number.isFinite(price as number) ? price : null,
-        imageUrl,
-        availableUntil,
-        typeof b.pickupPreferences === 'string' ? b.pickupPreferences.trim().slice(0, 300) : '',
-        JSON.stringify(reuseApps),
-        whatsapp,
-        verificationCheck.verificationId,
-        verificationCheck.aiStatus,
-        now,
-        now
-      );
-      markVerificationPublished(verificationCheck.verificationId, id);
-      db.exec('COMMIT');
-    } catch (err) {
-      try {
-        db.exec('ROLLBACK');
-      } catch {
-        /* ignore */
-      }
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to publish listing.' });
-      return;
-    }
+    db.prepare(
+      `INSERT INTO material_listings (
+        id, seller_id, seller_name, seller_organization, seller_verified, title, category,
+        description, quantity, unit, condition, location, indicative_price, currency,
+        image_url, available_until, pickup_preferences, reuse_applications, whatsapp_number,
+        status, is_hidden, is_demo, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, ?, ?, ?, 'Active', 0, 0, ?, ?)`
+    ).run(
+      id,
+      u.id,
+      u.name,
+      u.organization,
+      u.verification_status === 'Approved' ? 1 : 0,
+      b.title.trim().slice(0, 120),
+      b.category.trim(),
+      b.description.trim().slice(0, 1500),
+      qty,
+      b.unit.trim().slice(0, 24),
+      b.condition.trim(),
+      b.location.trim().slice(0, 120),
+      Number.isFinite(price as number) ? price : null,
+      imageUrl,
+      availableUntil,
+      typeof b.pickupPreferences === 'string' ? b.pickupPreferences.trim().slice(0, 300) : '',
+      JSON.stringify(reuseApps),
+      whatsapp,
+      now,
+      now
+    );
 
-    invalidatePublicSyncCache('material_listings');
     touchUserActivity(u.id);
     const row = db.prepare('SELECT * FROM material_listings WHERE id = ?').get(id) as Record<string, unknown>;
     res.status(201).json({ listing: mapMaterialListing(row) });
@@ -558,7 +516,6 @@ async function startServer() {
       res.status(result.statusCode).json({ error: result.error });
       return;
     }
-    invalidatePublicSyncCache('material_listings');
     res.json({ listing: result.listing });
   });
 
@@ -737,7 +694,6 @@ async function startServer() {
       );
     }
 
-    invalidatePublicSyncCache('material_listings');
     const updated = db.prepare('SELECT * FROM material_listings WHERE id = ?').get(req.params.id) as Record<string, unknown>;
     res.json({ listing: mapMaterialListing(updated) });
   });
@@ -939,36 +895,6 @@ async function startServer() {
       );
 
       if (status === 'Completed') {
-        // Mark the purchased/handed-over product Completed so it is immediately removed from Marketplace discovery
-        db.prepare(`UPDATE material_listings SET status = 'Completed', updated_at = ? WHERE id = ?`).run(
-          now,
-          String(row.listing_id)
-        );
-
-        // Decline any other open pending requests for the same completed listing
-        const otherOpenReqs = db
-          .prepare(
-            `SELECT id, buyer_id FROM material_requests
-             WHERE listing_id = ? AND id != ? AND status = 'Request Created'`
-          )
-          .all(String(row.listing_id), String(row.id)) as Array<{ id: string; buyer_id: string }>;
-
-        if (otherOpenReqs.length > 0) {
-          db.prepare(
-            `UPDATE material_requests SET status = 'Declined', updated_at = ?
-             WHERE listing_id = ? AND id != ? AND status = 'Request Created'`
-          ).run(now, String(row.listing_id), String(row.id));
-
-          for (const other of otherOpenReqs) {
-            addNotification(
-              other.buyer_id,
-              'Listing Completed',
-              `"${row.listing_title}" has already been completed with another buyer and is no longer available.`,
-              'workspace'
-            );
-          }
-        }
-
         const ledgerId = `mat_req_${String(row.id)}`;
         const alreadyRecorded = db.prepare('SELECT id FROM impact_ledger WHERE id = ?').get(ledgerId);
         if (!alreadyRecorded) {
@@ -995,7 +921,6 @@ async function startServer() {
       );
 
       db.exec('COMMIT');
-      invalidatePublicSyncCache('material_listings');
       res.json({ ok: true, status });
     } catch (err) {
       try {
@@ -1102,33 +1027,6 @@ async function startServer() {
     }
 
     const u = req.user!;
-    const unitVal = typeof b.unit === 'string' && b.unit.trim() ? b.unit.trim().slice(0, 24) : 'kg';
-    const imageUrl = typeof b.imageUrl === 'string' && b.imageUrl.trim() ? b.imageUrl.trim() : 'media:bakery';
-    const storageInfo = typeof b.storageInfo === 'string' ? b.storageInfo.trim().slice(0, 300) : '';
-    const allergens = typeof b.allergens === 'string' ? b.allergens.trim().slice(0, 300) : '';
-
-    const verificationCheck = validateAndLockListingVerification({
-      verificationId: b.verificationId,
-      userId: u.id,
-      listingType: 'food',
-      candidatePayload: {
-        title: b.title.trim(),
-        category: b.category.trim(),
-        description: b.description.trim(),
-        quantity: qty,
-        unit: unitVal,
-        portions,
-        location: b.location.trim(),
-        storageInfo,
-        allergens,
-        imageUrl,
-      },
-    });
-    if (!verificationCheck.ok) {
-      res.status(verificationCheck.statusCode).json({ error: verificationCheck.error });
-      return;
-    }
-
     const id = createId('food');
     const now = new Date().toISOString();
     const normalizedDeadline = new Date(b.pickupDeadline).toISOString();
@@ -1143,58 +1041,41 @@ async function startServer() {
         ? (normalizePhoneOrNull(b.whatsappNumber) ?? u.whatsapp_number)
         : u.whatsapp_number;
 
-    db.exec('BEGIN IMMEDIATE');
-    try {
-      db.prepare(
-        `INSERT INTO food_donations (
-          id, donor_id, donor_name, donor_organization, donor_verified, title, description,
-          category, quantity, unit, portions, remaining_portions, prepared_at, available_until,
-          pickup_deadline, storage_info, packaging_info, allergens, dietary_info, location,
-          collection_instructions, image_url, whatsapp_number, status, is_hidden, is_demo,
-          verification_id, ai_verification_status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', 0, 0, ?, ?, ?, ?)`
-      ).run(
-        id,
-        u.id,
-        u.name,
-        u.organization,
-        u.verification_status === 'Approved' ? 1 : 0,
-        b.title.trim().slice(0, 120),
-        b.description.trim().slice(0, 1500),
-        b.category.trim(),
-        qty,
-        unitVal,
-        portions,
-        portions,
-        preparedAt,
-        availableUntil,
-        normalizedDeadline,
-        storageInfo,
-        typeof b.packagingInfo === 'string' ? b.packagingInfo.trim().slice(0, 300) : '',
-        allergens,
-        typeof b.dietaryInfo === 'string' ? b.dietaryInfo.trim().slice(0, 200) : '',
-        b.location.trim().slice(0, 120),
-        typeof b.collectionInstructions === 'string' ? b.collectionInstructions.trim().slice(0, 400) : '',
-        imageUrl,
-        whatsapp,
-        verificationCheck.verificationId,
-        verificationCheck.aiStatus,
-        now,
-        now
-      );
-      markVerificationPublished(verificationCheck.verificationId, id);
-      db.exec('COMMIT');
-    } catch (err) {
-      try {
-        db.exec('ROLLBACK');
-      } catch {
-        /* ignore */
-      }
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to publish food donation.' });
-      return;
-    }
+    db.prepare(
+      `INSERT INTO food_donations (
+        id, donor_id, donor_name, donor_organization, donor_verified, title, description,
+        category, quantity, unit, portions, remaining_portions, prepared_at, available_until,
+        pickup_deadline, storage_info, packaging_info, allergens, dietary_info, location,
+        collection_instructions, image_url, whatsapp_number, status, is_hidden, is_demo, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', 0, 0, ?, ?)`
+    ).run(
+      id,
+      u.id,
+      u.name,
+      u.organization,
+      u.verification_status === 'Approved' ? 1 : 0,
+      b.title.trim().slice(0, 120),
+      b.description.trim().slice(0, 1500),
+      b.category.trim(),
+      qty,
+      typeof b.unit === 'string' && b.unit.trim() ? b.unit.trim().slice(0, 24) : 'kg',
+      portions,
+      portions,
+      preparedAt,
+      availableUntil,
+      normalizedDeadline,
+      typeof b.storageInfo === 'string' ? b.storageInfo.trim().slice(0, 300) : '',
+      typeof b.packagingInfo === 'string' ? b.packagingInfo.trim().slice(0, 300) : '',
+      typeof b.allergens === 'string' ? b.allergens.trim().slice(0, 300) : '',
+      typeof b.dietaryInfo === 'string' ? b.dietaryInfo.trim().slice(0, 200) : '',
+      b.location.trim().slice(0, 120),
+      typeof b.collectionInstructions === 'string' ? b.collectionInstructions.trim().slice(0, 400) : '',
+      typeof b.imageUrl === 'string' && b.imageUrl.trim() ? b.imageUrl.trim() : 'media:bakery',
+      whatsapp,
+      now,
+      now
+    );
 
-    invalidatePublicSyncCache('food_donations');
     touchUserActivity(u.id);
     const created = db.prepare('SELECT * FROM food_donations WHERE id = ?').get(id) as Record<string, unknown>;
     res.status(201).json({ donation: mapFoodDonation(created) });
@@ -1295,7 +1176,6 @@ async function startServer() {
       res.status(result.statusCode).json({ error: result.error });
       return;
     }
-    invalidatePublicSyncCache('food_donations');
     res.json({ donation: result.donation });
   });
 
@@ -1461,7 +1341,6 @@ async function startServer() {
       );
     }
 
-    invalidatePublicSyncCache('food_donations');
     const updated = db.prepare('SELECT * FROM food_donations WHERE id = ?').get(req.params.id) as Record<string, unknown>;
     res.json({ donation: mapFoodDonation(updated) });
   });
@@ -1714,7 +1593,6 @@ async function startServer() {
       );
 
       db.exec('COMMIT');
-      invalidatePublicSyncCache('food_donations');
       res.json({ ok: true, status });
     } catch (err) {
       try {
@@ -2180,46 +2058,68 @@ async function startServer() {
     });
   });
 
-  // Personal Impact Summary (Strictly authenticated user's own handovers & achievements; no leaderboard or comparative rankings)
-  app.get('/api/my/impact-summary', requireAuth, (req: AuthedRequest, res) => {
-    const u = req.user!;
-    const ledgerStats = db
+  app.get('/api/leaderboard', (req, res) => {
+    const windowParam = req.query.window === 'weekly' ? 'weekly' : req.query.window === 'monthly' ? 'monthly' : 'all';
+    const cutoff =
+      windowParam === 'weekly'
+        ? new Date(Date.now() - 7 * 86400_000).toISOString()
+        : windowParam === 'monthly'
+          ? new Date(Date.now() - 30 * 86400_000).toISOString()
+          : '1970-01-01T00:00:00.000Z';
+
+    const users = db
       .prepare(
-        `SELECT COUNT(*) as handovers,
-                SUM(CASE WHEN source_type = 'material' THEN 1 ELSE 0 END) as mat_count,
-                SUM(CASE WHEN source_type = 'food' THEN 1 ELSE 0 END) as food_count,
-                SUM(CASE WHEN source_type = 'oil' THEN 1 ELSE 0 END) as oil_count
-         FROM impact_ledger
-         WHERE user_id = ? AND is_demo = 0`
+        `SELECT id, name, organization, points, verification_status, public_leaderboard
+         FROM users
+         WHERE is_demo = 0 AND account_status = 'Active' AND role != 'admin' AND public_leaderboard = 1`
       )
-      .get(u.id) as {
-      handovers: number;
-      mat_count: number;
-      food_count: number;
-      oil_count: number;
-    };
+      .all() as Array<Record<string, unknown>>;
 
-    const listingCount = (
-      db.prepare('SELECT COUNT(*) as c FROM material_listings WHERE seller_id = ? AND is_demo = 0').get(u.id) as { c: number }
-    ).c;
+    const entries = users.map((u) => {
+      const uid = String(u.id);
+      const ledgerStats = db
+        .prepare(
+          `SELECT COUNT(*) as handovers, COALESCE(SUM(points_awarded), 0) as window_points,
+                  SUM(CASE WHEN source_type = 'material' THEN 1 ELSE 0 END) as mat_count,
+                  SUM(CASE WHEN source_type = 'food' THEN 1 ELSE 0 END) as food_count,
+                  SUM(CASE WHEN source_type = 'oil' THEN 1 ELSE 0 END) as oil_count
+           FROM impact_ledger
+           WHERE user_id = ? AND is_demo = 0 AND completed_at >= ?`
+        )
+        .get(uid, cutoff) as {
+        handovers: number;
+        window_points: number;
+        mat_count: number;
+        food_count: number;
+        oil_count: number;
+      };
 
-    const achievements: string[] = [];
-    if (listingCount > 0) achievements.push('Verified Material Contributor');
-    if ((ledgerStats.mat_count || 0) > 0) achievements.push('Material Handover Contributor');
-    if ((ledgerStats.food_count || 0) > 0) achievements.push('Food Rescue Contributor');
-    if ((ledgerStats.oil_count || 0) > 0) achievements.push('Oil Recovery Contributor');
-    if (Number(u.points) >= 300) achievements.push('Circular Economy Pioneer');
-    if (u.verification_status === 'Approved') achievements.push('Verified Organization');
+      const listingCount = (
+        db.prepare('SELECT COUNT(*) as c FROM material_listings WHERE seller_id = ? AND is_demo = 0').get(uid) as { c: number }
+      ).c;
 
-    res.json({
-      points: Number(u.points || 0),
-      completedHandovers: Number(ledgerStats.handovers || 0),
-      achievements,
+      const achievements: string[] = [];
+      if (listingCount > 0) achievements.push('First Material Listing');
+      if ((ledgerStats.mat_count || 0) > 0) achievements.push('Material Handover Contributor');
+      if ((ledgerStats.food_count || 0) > 0) achievements.push('Food Rescue Contributor');
+      if ((ledgerStats.oil_count || 0) > 0) achievements.push('Oil Recovery Contributor');
+      if (Number(u.points) >= 300) achievements.push('Circular Economy Pioneer');
+      if (u.verification_status === 'Approved') achievements.push('Verified Organization');
+
+      return {
+        userId: String(u.id),
+        displayName: String(u.name),
+        organization: String(u.organization || 'Community Participant'),
+        points: windowParam === 'all' ? Number(u.points) : Number(ledgerStats.window_points || 0),
+        completedHandovers: Number(ledgerStats.handovers || 0),
+        achievements,
+        verified: u.verification_status === 'Approved',
+      };
     });
-  });
 
-  // Register AI-Powered Listing Verification & Admin Human-Review Routes
-  registerListingVerificationRoutes(app);
+    entries.sort((a, b) => b.points - a.points || b.completedHandovers - a.completedHandovers);
+    res.json({ entries });
+  });
 
   // --- AI ENDPOINTS (SERVER-SIDE ONLY) ---
   function extractValidatedImagePayload(imageDataUrl: unknown): {
@@ -2418,11 +2318,6 @@ async function startServer() {
         error: err instanceof Error ? err.message : 'Unable to reach Eco AI Assistant right now.',
       });
     }
-  });
-
-  // Explicit 404 for unknown API routes so SPA fallback never masks removed/invalid API endpoints
-  app.all('/api/*', (_req, res) => {
-    res.status(404).json({ error: 'API endpoint not found.' });
   });
 
   // --- VITE / STATIC SERVING ---

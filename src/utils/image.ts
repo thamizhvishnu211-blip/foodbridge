@@ -2,10 +2,10 @@ const MAX_FIRESTORE_DATA_URL_CHARS = 520_000;
 
 export async function compressImageDataUrlForFirestore(
   dataUrl: string,
-  fallbackPreset = 'none'
+  fallbackPreset = 'media:aluminium'
 ): Promise<string> {
   if (!dataUrl || !dataUrl.startsWith('data:image/')) {
-    return dataUrl && !dataUrl.startsWith('media:') ? dataUrl : fallbackPreset;
+    return dataUrl || fallbackPreset;
   }
   if (dataUrl.length <= MAX_FIRESTORE_DATA_URL_CHARS) {
     return dataUrl;

@@ -4,7 +4,6 @@ import {
   ChevronUp,
   Droplets,
   MessageCircle,
-  Package,
   Scan,
   ShieldCheck,
   Sparkles,
@@ -12,10 +11,11 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
-import { resolveImageSrc } from '../data/media';
+import { MEDIA_ASSETS, resolveImageSrc } from '../data/media';
 import type { AppTab, FoodDonation, ImpactSummary, MaterialListing } from '../types';
 import { buildWhatsAppUrl, formatDateTime } from '../utils/format';
 import { AnimatedCounter } from './AnimatedCounter';
+import { VideoBackground } from './VideoBackground';
 
 interface HomePageProps {
   impact: ImpactSummary | null;
@@ -59,8 +59,8 @@ const FAQS = [
     a: 'No. VERDORA is a resource coordination platform. Indicative prices may be listed for reference, and all handovers are coordinated directly between participants via WhatsApp.',
   },
   {
-    q: 'How does AI Listing Verification work?',
-    a: 'Every new listing passes through Verdora AI for duplicate detection, image and description consistency checks, and fraud-risk screening before publishing. AI approval helps catch suspicious listings but does not guarantee authenticity.',
+    q: 'How does the AI Material Scanner handle accuracy?',
+    a: 'When configured with Gemini, the scanner provides a visual estimate of material type, condition, and reuse applications along with a quality checklist. It never claims laboratory certification.',
   },
   {
     q: 'How are Food Rescue safety and expiration handled?',
@@ -101,8 +101,10 @@ export function HomePage({
 
   return (
     <div className="bg-[#0A110E] text-[#F4F7F4]">
-      {/* 1. HERO */}
+      {/* 1. CINEMATIC HERO */}
       <section className="relative flex min-h-[82vh] items-center overflow-hidden bg-[#0A110E] text-[#F4F7F4]">
+        <VideoBackground alt="Sunlit sustainable circular economy timber pavilion nestled in a forest canopy" />
+
         <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
@@ -205,6 +207,14 @@ export function HomePage({
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 items-stretch">
           <div className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#A9B78D]/20 bg-[#111C17] text-[#F4F7F4]">
+            <div className="aspect-[16/9] w-full overflow-hidden bg-[#0D1612]">
+              <img
+                src={MEDIA_ASSETS.aluminium}
+                alt="Sorted brushed aluminium sheets ready for secondary manufacturing"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover"
+              />
+            </div>
             <div className="flex flex-1 flex-col justify-between p-7 sm:p-9">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
@@ -240,6 +250,14 @@ export function HomePage({
           </div>
 
           <div className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#93C9A3]/25 bg-[#14231C] text-[#F4F7F4]">
+            <div className="aspect-[16/9] w-full overflow-hidden bg-[#0D1612]">
+              <img
+                src={MEDIA_ASSETS.produce}
+                alt="Fresh harvest produce crate prepared for local food rescue redistribution"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover"
+              />
+            </div>
             <div className="flex flex-1 flex-col justify-between p-7 sm:p-9">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
@@ -327,15 +345,15 @@ export function HomePage({
             <div>
               <Scan className="h-6 w-6 text-[#93C9A3]" />
               <h3 className="mt-4 font-display text-xl font-semibold text-[#F4F7F4]">
-                AI Material & Food Scanner
+                AI Material Scanner
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-[#C8D6CD]">
-                Upload a photo or describe reusable materials or surplus food to get instant AI
-                classification, reuse applications, allergen & storage tips, and a draft listing.
+                Upload a photo of offcuts, timber, or textiles to generate a structured material
+                assessment, quality checklist, and draft listing in one click.
               </p>
             </div>
             <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-semibold text-[#93C9A3] group-hover:underline">
-              Open AI Scanner <ArrowRight className="h-3.5 w-3.5" />
+              Launch Scanner <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </button>
 
@@ -416,27 +434,19 @@ export function HomePage({
             <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
               {featuredMaterials.map((item) => {
                 const waUrl = buildWhatsAppUrl(item.whatsappNumber, 'material', item.title);
-                const imgSrc = resolveImageSrc(item.imageUrl);
                 return (
                   <article
                     key={item.id}
                     className="flex flex-col overflow-hidden rounded-2xl border border-[#A9B78D]/18 bg-[#111C17]"
                   >
-                    {imgSrc ? (
-                      <div className="aspect-[4/3] w-full overflow-hidden bg-[#0D1612]">
-                        <img
-                          src={imgSrc}
-                          alt={item.title}
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-36 w-full flex-col items-center justify-center gap-2 border-b border-[#A9B78D]/12 bg-[#0D1612] text-[#8FA89B]">
-                        <Package className="h-7 w-7 opacity-60" />
-                        <span className="text-[11px]">{item.category}</span>
-                      </div>
-                    )}
+                    <div className="aspect-[4/3] w-full overflow-hidden bg-[#0D1612]">
+                      <img
+                        src={resolveImageSrc(item.imageUrl, 'aluminium')}
+                        alt={item.title}
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]"
+                      />
+                    </div>
                     <div className="flex flex-1 flex-col justify-between p-5">
                       <div>
                         <div className="text-xs text-[#9BB0A3]">
@@ -510,26 +520,20 @@ export function HomePage({
           </div>
         ) : (
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {featuredFood.map((donation) => {
-              const imgSrc = resolveImageSrc(donation.imageUrl);
-              return (
-                <article
-                  key={donation.id}
-                  className={`grid grid-cols-1 overflow-hidden rounded-2xl border border-[#A9B78D]/20 bg-[#111C17] ${
-                    imgSrc ? 'sm:grid-cols-5' : ''
-                  }`}
-                >
-                  {imgSrc && (
-                    <div className="aspect-[4/3] sm:aspect-auto sm:col-span-2 bg-[#0D1612]">
-                      <img
-                        src={imgSrc}
-                        alt={donation.title}
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className={`flex flex-col justify-between p-6 ${imgSrc ? 'sm:col-span-3' : ''}`}>
+            {featuredFood.map((donation) => (
+              <article
+                key={donation.id}
+                className="grid grid-cols-1 overflow-hidden rounded-2xl border border-[#A9B78D]/20 bg-[#111C17] sm:grid-cols-5"
+              >
+                <div className="aspect-[4/3] sm:aspect-auto sm:col-span-2 bg-[#0D1612]">
+                  <img
+                    src={resolveImageSrc(donation.imageUrl, 'bakery')}
+                    alt={donation.title}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="flex flex-col justify-between p-6 sm:col-span-3">
                   <div>
                     <div className="text-xs text-[#9BB0A3]">
                       {donation.category} · <span className="tabular-nums font-medium text-[#93C9A3]">{donation.remainingPortions} portions left</span>
@@ -557,10 +561,9 @@ export function HomePage({
                       <span>Inspect & Request</span>
                     </button>
                   </div>
-                  </div>
-                </article>
-              );
-            })}
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </section>
@@ -588,7 +591,7 @@ export function HomePage({
                   onClick={() => onNavigate('impact')}
                   className="rounded-lg bg-[#2B7A58] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer"
                 >
-                  View Live Eco Impact
+                  View Impact & Leaderboard
                 </button>
                 <button
                   type="button"
@@ -643,7 +646,7 @@ export function HomePage({
                 Ready to circulate materials, rescue food, or recover cooking oil?
               </h2>
               <p className="mt-2 text-sm text-[#D2DDD6]">
-                Sign in directly with Google and verify your listing with Verdora AI in seconds.
+                Sign in directly with Google or try our AI Material Scanner in seconds.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

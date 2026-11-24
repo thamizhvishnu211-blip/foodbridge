@@ -14,70 +14,11 @@ const MOCK_CERTS_PORT = 3205;
 const MOCK_CERTS_URL = `http://127.0.0.1:${MOCK_CERTS_PORT}/certs`;
 const FIREBASE_PROJECT_ID = 'conductive-tesla-1c70r';
 
-import zlib from 'node:zlib';
-
-// Minimal 1x1 PNG (triggers low-res warning -> NEEDS_REVIEW)
-const TINY_PNG =
+// Minimal valid 1x1 transparent PNG data URI (well under 5 MB, genuine JPEG/PNG/WebP data URI format)
+const SAMPLE_PNG_1 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
-// Generate unique realistic-sized valid PNG data URIs (> 2.5 KB) so duplicate image-hash & resolution checks work deterministically
-function makeSamplePng(seed: number): string {
-  const width = 48;
-  const height = 48;
-  const raw = Buffer.alloc(height * (1 + width * 3));
-  let x = (seed * 2654435761) >>> 0;
-  for (let y = 0; y < height; y++) {
-    const rowStart = y * (1 + width * 3);
-    raw[rowStart] = 0; // filter type 0
-    for (let col = 0; col < width; col++) {
-      x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
-      raw[rowStart + 1 + col * 3] = (x >>> 16) & 0xff;
-      raw[rowStart + 1 + col * 3 + 1] = (x >>> 8) & 0xff;
-      raw[rowStart + 1 + col * 3 + 2] = x & 0xff;
-    }
-  }
-  const crcTable = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    crcTable[n] = c >>> 0;
-  }
-  const crc32 = (buf: Buffer) => {
-    let c = 0xffffffff;
-    for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  };
-  const chunk = (type: string, data: Buffer) => {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length, 0);
-    const typeBuf = Buffer.from(type, 'ascii');
-    const crcBuf = Buffer.alloc(4);
-    crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-    return Buffer.concat([len, typeBuf, data, crcBuf]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // RGB
-  const idat = zlib.deflateSync(raw);
-  const png = Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-  return `data:image/png;base64,${png.toString('base64')}`;
-}
-
-const SAMPLE_PNG_1 = makeSamplePng(101);
-const SAMPLE_PNG_2 = makeSamplePng(202);
-const SAMPLE_PNG_3 = makeSamplePng(303);
-const SAMPLE_PNG_4 = makeSamplePng(404);
-const SAMPLE_PNG_5 = makeSamplePng(505);
-const SAMPLE_PNG_6 = makeSamplePng(606);
-const SAMPLE_PNG_7 = makeSamplePng(707);
-const SAMPLE_PNG_8 = makeSamplePng(808);
+const SAMPLE_PNG_2 =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR42mP8z8BQzwAEjDAGACfNAgFAq3/xAAAAAElFTkSuQmCC';
 
 function cleanupDb(dbPath: string) {
   for (const suffix of ['', '-wal', '-shm']) {
@@ -191,7 +132,6 @@ function spawnServer(port: number, dbPath: string, adminEmail = 'operator.listin
       VERDORA_ADMIN_EMAIL: adminEmail,
       VERDORA_ADMIN_NAME: 'Listings Operator',
       VERDORA_FIREBASE_CERTS_URL: MOCK_CERTS_URL,
-      GEMINI_API_KEY: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -437,82 +377,9 @@ async function runWorkflowSuite() {
       assert.equal((await apiJson(baseUrl, '/api/materials/fake/cancel', { method: 'POST' })).status, 401);
       assert.equal((await apiJson(baseUrl, '/api/food-donations/fake/cancel', { method: 'POST' })).status, 401);
 
-      // Verify Leaderboard route is completely removed (404)
-      assert.equal((await apiJson(baseUrl, '/api/leaderboard')).status, 404, 'Leaderboard endpoint must be removed');
-
-      // Verify personal impact summary works for signed-in users
-      const myImp = await apiJson<{ points: number; completedHandovers: number }>(
-        baseUrl,
-        '/api/my/impact-summary',
-        { token: seller.token }
-      );
-      assert.equal(myImp.status, 200);
-      assert.equal(typeof myImp.data.points, 'number');
-
-      // Helper: verify a payload through Verdora AI before publishing
-      const verifyPayload = async (
-        token: string,
-        listingType: 'material' | 'food' | 'oil',
-        payload: Record<string, unknown>,
-        evidenceNotes?: string
-      ) => {
-        const res = await apiJson<{
-          verification: {
-            id: string;
-            status: 'VERIFIED' | 'NEEDS_REVIEW' | 'HIGH_RISK';
-            canPublish: boolean;
-            humanReviewStatus: string;
-            disclaimer: string;
-          };
-        }>(baseUrl, '/api/ai/verify-listing', {
-          method: 'POST',
-          token,
-          body: { listingType, payload, evidenceNotes },
-        });
-        assert.equal(res.status, 201, `AI verify failed for ${listingType}: ${JSON.stringify(res.data)}`);
-        return res.data.verification;
-      };
-
-      // --- TEST A: Material Marketplace Anti-Bypass -> AI Verify -> Create -> Discover -> Edit -> Cancel ---
-      console.log('   TEST A: Material Marketplace AI Verification, Anti-Bypass, Create, Discover, Edit, Cancel...');
+      // --- TEST A: Material Marketplace Create -> Discover -> Edit -> Cancel ---
+      console.log('   TEST A: Material Marketplace Create, Discover, Edit, Invalid Edit, Cancel...');
       const availableUntilInitial = new Date(Date.now() + 14 * 86400_000).toISOString();
-      const matAPayload = {
-        title: 'Extruded Aluminium Rails',
-        category: 'Aluminium',
-        description: 'Clean 40x40 T-slot aluminium extrusion offcuts from framing job stored dry in workshop.',
-        quantity: 100,
-        unit: 'kg',
-        condition: 'Unused Surplus',
-        location: 'Bengaluru',
-        indicativePrice: 2500,
-        availableUntil: availableUntilInitial,
-        pickupPreferences: 'Weekdays 9am-4pm',
-        reuseApplications: ['Workbenches', 'CNC Gantry'],
-        whatsappNumber: '+919876543210',
-        imageUrl: SAMPLE_PNG_1,
-      };
-
-      // Direct unverified POST must be blocked (403)
-      const bypassMat = await apiJson(baseUrl, '/api/materials', {
-        method: 'POST',
-        token: seller.token,
-        body: matAPayload,
-      });
-      assert.equal(bypassMat.status, 403, 'Direct manual POST /api/materials without AI verification must fail with 403');
-
-      const matAVer = await verifyPayload(seller.token, 'material', matAPayload);
-      assert.equal(matAVer.status, 'VERIFIED', 'Valid material listing must receive VERIFIED');
-      assert.equal(matAVer.canPublish, true);
-      assert.ok(matAVer.disclaimer.toLowerCase().includes('cannot guarantee'));
-
-      // Tampering with payload after verification must be blocked (409)
-      const tamperedMat = await apiJson(baseUrl, '/api/materials', {
-        method: 'POST',
-        token: seller.token,
-        body: { ...matAPayload, indicativePrice: 999999, verificationId: matAVer.id },
-      });
-      assert.equal(tamperedMat.status, 409, 'Tampered payload with valid verificationId must be rejected with 409');
-
       const createMat = await apiJson<{
         listing: {
           id: string;
@@ -527,7 +394,21 @@ async function runWorkflowSuite() {
       }>(baseUrl, '/api/materials', {
         method: 'POST',
         token: seller.token,
-        body: { ...matAPayload, verificationId: matAVer.id },
+        body: {
+          title: 'Extruded Aluminium Rails',
+          category: 'Aluminium',
+          description: 'Clean 40x40 T-slot aluminium extrusion offcuts from framing job.',
+          quantity: 100,
+          unit: 'kg',
+          condition: 'Unused Surplus',
+          location: 'Bengaluru',
+          indicativePrice: 2500,
+          availableUntil: availableUntilInitial,
+          pickupPreferences: 'Weekdays 9am-4pm',
+          reuseApplications: ['Workbenches', 'CNC Gantry'],
+          whatsappNumber: '+919876543210',
+          imageUrl: SAMPLE_PNG_1,
+        },
       });
       assert.equal(createMat.status, 201);
       const matA = createMat.data.listing;
@@ -654,35 +535,9 @@ async function runWorkflowSuite() {
         409
       );
 
-      // --- TEST B: Food Rescue AI Verification, Anti-Bypass, Create, Discover, Edit, Cancel ---
-      console.log('   TEST B: Food Rescue AI Verification, Anti-Bypass, Create, Discover, Edit, Cancel...');
+      // --- TEST B: Food Rescue Create -> Discover -> Edit -> Invalid Edit -> Cancel ---
+      console.log('   TEST B: Food Rescue Create, Discover, Edit, Invalid Edit, Cancel...');
       const foodDeadline1 = new Date(Date.now() + 4 * 3600_000).toISOString();
-      const foodBPayload = {
-        title: 'Artisan Focaccia & Salad Bowls',
-        category: 'Bakery items',
-        description: 'Freshly baked trays and sealed green salads from lunch service kept hygienically chilled.',
-        quantity: 15,
-        unit: 'kg',
-        portions: 20,
-        preparedAt: new Date(Date.now() - 3600_000).toISOString(),
-        pickupDeadline: foodDeadline1,
-        storageInfo: 'Chilled at 4C in walk-in cooler',
-        packagingInfo: 'Compostable sealed containers',
-        allergens: 'Gluten, Sesame',
-        dietaryInfo: 'Vegetarian',
-        location: 'Bengaluru',
-        collectionInstructions: 'Ring kitchen back bell',
-        whatsappNumber: '+919876543222',
-        imageUrl: SAMPLE_PNG_3,
-      };
-      assert.equal(
-        (await apiJson(baseUrl, '/api/food-donations', { method: 'POST', token: donor.token, body: foodBPayload })).status,
-        403,
-        'Direct manual POST /api/food-donations must fail with 403'
-      );
-      const foodBVer = await verifyPayload(donor.token, 'food', foodBPayload);
-      assert.equal(foodBVer.status, 'VERIFIED');
-
       const createFood = await apiJson<{
         donation: {
           id: string;
@@ -697,14 +552,31 @@ async function runWorkflowSuite() {
       }>(baseUrl, '/api/food-donations', {
         method: 'POST',
         token: donor.token,
-        body: { ...foodBPayload, verificationId: foodBVer.id },
+        body: {
+          title: 'Artisan Focaccia & Salad Bowls',
+          category: 'Bakery items',
+          description: 'Freshly baked trays and sealed green salads from lunch service.',
+          quantity: 15,
+          unit: 'kg',
+          portions: 20,
+          preparedAt: new Date(Date.now() - 3600_000).toISOString(),
+          pickupDeadline: foodDeadline1,
+          storageInfo: 'Chilled at 4C in walk-in cooler',
+          packagingInfo: 'Compostable sealed containers',
+          allergens: 'Gluten, Sesame',
+          dietaryInfo: 'Vegetarian',
+          location: 'South Congress',
+          collectionInstructions: 'Ring kitchen back bell',
+          whatsappNumber: '+15125550222',
+          imageUrl: SAMPLE_PNG_1,
+        },
       });
       assert.equal(createFood.status, 201);
       const foodB = createFood.data.donation;
       assert.equal(foodB.status, 'Available');
       assert.equal(foodB.portions, 20);
       assert.equal(foodB.remainingPortions, 20);
-      assert.equal(foodB.imageUrl, SAMPLE_PNG_3);
+      assert.equal(foodB.imageUrl, SAMPLE_PNG_1);
 
       // Recipient discovers food donation
       const discoverFood = await apiJson<{ donations: Array<{ id: string }> }>(baseUrl, '/api/food-donations');
@@ -835,25 +707,20 @@ async function runWorkflowSuite() {
       console.log('   TEST D: Request integrity, committed quantity guards, pending cancellation & handover completion...');
 
       // D1: Material with pending request CAN be cancelled -> request preserved & moved to Declined + notification
-      const matPendingPayload = {
-        title: 'Copper Busbar Offcuts',
-        category: 'Aluminium',
-        description: 'Clean copper offcuts suitable for electrical prototyping in workshop.',
-        quantity: 50,
-        unit: 'kg',
-        condition: 'Good',
-        location: 'Chennai',
-        availableUntil: new Date(Date.now() + 10 * 86400_000).toISOString(),
-        imageUrl: SAMPLE_PNG_4,
-      };
-      const matPendingVer = await verifyPayload(seller.token, 'material', matPendingPayload);
-      assert.equal(matPendingVer.status, 'VERIFIED');
       const matPendingRes = await apiJson<{ listing: { id: string } }>(baseUrl, '/api/materials', {
         method: 'POST',
         token: seller.token,
-        body: { ...matPendingPayload, verificationId: matPendingVer.id },
+        body: {
+          title: 'Copper Busbar Offcuts',
+          category: 'Aluminium',
+          description: 'Clean copper offcuts suitable for electrical prototyping.',
+          quantity: 50,
+          unit: 'kg',
+          condition: 'Good',
+          location: 'Austin',
+          availableUntil: new Date(Date.now() + 10 * 86400_000).toISOString(),
+        },
       });
-      assert.equal(matPendingRes.status, 201);
       const matPendingId = matPendingRes.data.listing.id;
 
       const buyerPendingMatReq = await apiJson<{ id: string }>(baseUrl, '/api/material-requests', {
@@ -892,28 +759,23 @@ async function runWorkflowSuite() {
       assert.ok(buyerNotifs.data.notifications.some((n) => n.title.includes('Cancelled')));
 
       // D2: Food with pending request CAN be cancelled -> request moved to Declined + notification
-      const foodPendingPayload = {
-        title: 'Steamed Rice & Lentil Trays',
-        category: 'Prepared meals',
-        description: 'Sealed hot-held meal trays ready for same-day community pickup.',
-        quantity: 8,
-        unit: 'kg',
-        portions: 16,
-        pickupDeadline: new Date(Date.now() + 5 * 3600_000).toISOString(),
-        storageInfo: 'Hot-held 65C',
-        packagingInfo: 'Sealed foil gastronorm pans',
-        allergens: 'None',
-        location: 'Chennai',
-        imageUrl: SAMPLE_PNG_5,
-      };
-      const foodPendingVer = await verifyPayload(donor.token, 'food', foodPendingPayload);
-      assert.equal(foodPendingVer.status, 'VERIFIED');
       const foodPendingRes = await apiJson<{ donation: { id: string } }>(baseUrl, '/api/food-donations', {
         method: 'POST',
         token: donor.token,
-        body: { ...foodPendingPayload, verificationId: foodPendingVer.id },
+        body: {
+          title: 'Steamed Rice & Lentil Trays',
+          category: 'Prepared meals',
+          description: 'Sealed hot-held meal trays ready for same-day pickup.',
+          quantity: 8,
+          unit: 'kg',
+          portions: 16,
+          pickupDeadline: new Date(Date.now() + 5 * 3600_000).toISOString(),
+          storageInfo: 'Hot-held 65C',
+          packagingInfo: 'Sealed foil gastronorm pans',
+          allergens: 'None',
+          location: 'Austin',
+        },
       });
-      assert.equal(foodPendingRes.status, 201);
       const foodPendingId = foodPendingRes.data.donation.id;
 
       const recPendingFoodReq = await apiJson<{ id: string }>(baseUrl, '/api/food-requests', {
@@ -944,25 +806,20 @@ async function runWorkflowSuite() {
       );
 
       // D3: Accepted requests block cancellation (409), enforce committed qty/portions minimum (409), recalculate remainingPortions, and complete cleanly
-      const matAcceptedPayload = {
-        title: 'Marine Plywood Sheets',
-        category: 'Wood',
-        description: 'Clean 18mm marine plywood full sheets stored indoors on dry racks.',
-        quantity: 40,
-        unit: 'kg',
-        condition: 'Like New',
-        location: 'Chennai',
-        availableUntil: new Date(Date.now() + 12 * 86400_000).toISOString(),
-        imageUrl: SAMPLE_PNG_6,
-      };
-      const matAcceptedVer = await verifyPayload(seller.token, 'material', matAcceptedPayload);
-      assert.equal(matAcceptedVer.status, 'VERIFIED');
       const matAcceptedRes = await apiJson<{ listing: { id: string } }>(baseUrl, '/api/materials', {
         method: 'POST',
         token: seller.token,
-        body: { ...matAcceptedPayload, verificationId: matAcceptedVer.id },
+        body: {
+          title: 'Marine Plywood Sheets',
+          category: 'Wood',
+          description: 'Clean 18mm marine plywood full sheets stored indoors.',
+          quantity: 40,
+          unit: 'kg',
+          condition: 'Like New',
+          location: 'Austin',
+          availableUntil: new Date(Date.now() + 12 * 86400_000).toISOString(),
+        },
       });
-      assert.equal(matAcceptedRes.status, 201);
       const matAcceptedId = matAcceptedRes.data.listing.id;
 
       const acceptedMatReq = await apiJson<{ id: string }>(baseUrl, '/api/material-requests', {
@@ -1016,28 +873,23 @@ async function runWorkflowSuite() {
       );
 
       // Food accepted request checks
-      const foodAcceptedPayload = {
-        title: 'Roasted Vegetable Pasta Trays',
-        category: 'Prepared meals',
-        description: 'Freshly portioned trays held warm for evening distribution to local shelters.',
-        quantity: 12,
-        unit: 'kg',
-        portions: 24,
-        pickupDeadline: new Date(Date.now() + 6 * 3600_000).toISOString(),
-        storageInfo: 'Hot-held 63C',
-        packagingInfo: 'Sealed trays',
-        allergens: 'Gluten',
-        location: 'Chennai',
-        imageUrl: SAMPLE_PNG_7,
-      };
-      const foodAcceptedVer = await verifyPayload(donor.token, 'food', foodAcceptedPayload);
-      assert.equal(foodAcceptedVer.status, 'VERIFIED');
       const foodAcceptedRes = await apiJson<{ donation: { id: string } }>(baseUrl, '/api/food-donations', {
         method: 'POST',
         token: donor.token,
-        body: { ...foodAcceptedPayload, verificationId: foodAcceptedVer.id },
+        body: {
+          title: 'Roasted Vegetable Pasta Trays',
+          category: 'Prepared meals',
+          description: 'Freshly portioned trays held warm for evening distribution.',
+          quantity: 12,
+          unit: 'kg',
+          portions: 24,
+          pickupDeadline: new Date(Date.now() + 6 * 3600_000).toISOString(),
+          storageInfo: 'Hot-held 63C',
+          packagingInfo: 'Sealed trays',
+          allergens: 'Gluten',
+          location: 'Austin',
+        },
       });
-      assert.equal(foodAcceptedRes.status, 201);
       const foodAcceptedId = foodAcceptedRes.data.donation.id;
 
       const acceptedFoodReq = await apiJson<{ id: string }>(baseUrl, '/api/food-requests', {
@@ -1086,32 +938,13 @@ async function runWorkflowSuite() {
       assert.equal(increaseFoodPortions.data.donation.portions, 30);
       assert.equal(increaseFoodPortions.data.donation.remainingPortions, 6);
 
-      // Complete both accepted requests and verify completed material listing disappears from Marketplace
+      // Complete both accepted requests and verify impact ledger updates
       const completeMatReq = await apiJson(
         baseUrl,
         `/api/material-requests/${acceptedMatReq.data.id}/status`,
         { method: 'PATCH', token: buyer.token, body: { status: 'Completed' } }
       );
       assert.equal(completeMatReq.status, 200);
-
-      // Completed material listing MUST NOT appear in public marketplace
-      const publicAfterComplete = await apiJson<{ listings: Array<{ id: string }> }>(
-        baseUrl,
-        '/api/materials'
-      );
-      assert.ok(
-        !publicAfterComplete.data.listings.some((l) => l.id === matAcceptedId),
-        'Completed material listing must be removed from public marketplace'
-      );
-      const myMatsAfterComplete = await apiJson<{ listings: Array<{ id: string; status: string }> }>(
-        baseUrl,
-        '/api/my/materials',
-        { token: seller.token }
-      );
-      assert.equal(
-        myMatsAfterComplete.data.listings.find((l) => l.id === matAcceptedId)?.status,
-        'Completed'
-      );
 
       const completeFoodReq = await apiJson(
         baseUrl,
@@ -1197,30 +1030,27 @@ async function runWorkflowSuite() {
       assert.ok(scanFoodText.data.storageAdvice.length > 0);
       assert.ok(scanFoodText.data.potentialAllergens.length > 0);
 
-      const aiFoodPayload = {
-        title: scanFoodText.data.suggestedTitle,
-        category: scanFoodText.data.suggestedCategory,
-        description: scanFoodText.data.suggestedDescription,
-        quantity: scanFoodText.data.estimatedQuantity,
-        unit: scanFoodText.data.estimatedUnit,
-        portions: scanFoodText.data.estimatedPortions,
-        pickupDeadline: new Date(Date.now() + 5 * 3600_000).toISOString(),
-        storageInfo: scanFoodText.data.storageAdvice,
-        packagingInfo: scanFoodText.data.packagingAdvice,
-        allergens: scanFoodText.data.potentialAllergens,
-        dietaryInfo: scanFoodText.data.dietaryTags,
-        location: 'Bengaluru',
-        imageUrl: SAMPLE_PNG_8,
-      };
-      const aiFoodVer = await verifyPayload(donor.token, 'food', aiFoodPayload);
-      assert.equal(aiFoodVer.status, 'VERIFIED');
       const aiFoodPost = await apiJson<{ donation: { id: string; status: string; remainingPortions: number } }>(
         baseUrl,
         '/api/food-donations',
         {
           method: 'POST',
           token: donor.token,
-          body: { ...aiFoodPayload, verificationId: aiFoodVer.id },
+          body: {
+            title: scanFoodText.data.suggestedTitle,
+            category: scanFoodText.data.suggestedCategory,
+            description: scanFoodText.data.suggestedDescription,
+            quantity: scanFoodText.data.estimatedQuantity,
+            unit: scanFoodText.data.estimatedUnit,
+            portions: scanFoodText.data.estimatedPortions,
+            pickupDeadline: new Date(Date.now() + 5 * 3600_000).toISOString(),
+            storageInfo: scanFoodText.data.storageAdvice,
+            packagingInfo: scanFoodText.data.packagingAdvice,
+            allergens: scanFoodText.data.potentialAllergens,
+            dietaryInfo: scanFoodText.data.dietaryTags,
+            location: 'Bengaluru',
+            imageUrl: SAMPLE_PNG_1,
+          },
         }
       );
       assert.equal(aiFoodPost.status, 201);
@@ -1228,98 +1058,30 @@ async function runWorkflowSuite() {
       assert.equal(aiFoodPost.data.donation.status, 'Available');
 
       // E4: Publish an INR material listing in Bengaluru and verify INR + AI guide for both food & object seekers
-      const inrMatPayload = {
-        title: 'Bengaluru Workshop Steel Shelving Frames',
-        category: 'Steel',
-        description: 'Heavy-duty modular steel shelving frames in good structural condition for Bengaluru pickup.',
-        quantity: 120,
-        unit: 'kg',
-        condition: 'Good',
-        location: 'Bengaluru',
-        indicativePrice: 1500,
-        availableUntil: new Date(Date.now() + 14 * 86400_000).toISOString(),
-        imageUrl: makeSamplePng(909),
-      };
-      const inrMatVer = await verifyPayload(seller.token, 'material', inrMatPayload);
-      assert.equal(inrMatVer.status, 'VERIFIED');
       const inrMatPost = await apiJson<{ listing: { id: string; currency: string; indicativePrice: number } }>(
         baseUrl,
         '/api/materials',
         {
           method: 'POST',
           token: seller.token,
-          body: { ...inrMatPayload, verificationId: inrMatVer.id },
+          body: {
+            title: 'Bengaluru Workshop Steel Shelving Frames',
+            category: 'Steel',
+            description: 'Heavy-duty modular steel shelving frames in good structural condition for Bengaluru pickup.',
+            quantity: 120,
+            unit: 'kg',
+            condition: 'Good',
+            location: 'Bengaluru',
+            indicativePrice: 1500,
+            availableUntil: new Date(Date.now() + 14 * 86400_000).toISOString(),
+            imageUrl: SAMPLE_PNG_2,
+          },
         }
       );
       assert.equal(inrMatPost.status, 201);
       assert.equal(inrMatPost.data.listing.currency, 'INR');
       assert.equal(inrMatPost.data.listing.indicativePrice, 1500);
       const inrMatId = inrMatPost.data.listing.id;
-
-      // E4b: Duplicate submission must be flagged HIGH_RISK and blocked from publishing
-      const dupVer = await verifyPayload(seller.token, 'material', inrMatPayload);
-      assert.equal(dupVer.status, 'HIGH_RISK', 'Duplicate listing must be flagged HIGH_RISK');
-      assert.equal(dupVer.canPublish, false);
-      assert.equal(
-        (
-          await apiJson(baseUrl, '/api/materials', {
-            method: 'POST',
-            token: seller.token,
-            body: { ...inrMatPayload, verificationId: dupVer.id },
-          })
-        ).status,
-        403,
-        'HIGH_RISK verification must be blocked from publishing'
-      );
-
-      // E4c: NEEDS_REVIEW -> Request Human Review -> Admin Approves -> Publishing succeeds
-      const reviewPayload = {
-        title: 'Recycled HDPE Pellets Sack',
-        category: 'Plastic',
-        description: 'Clean regrind HDPE pellets packed in 25kg woven sacks at Bengaluru facility.',
-        quantity: 75,
-        unit: 'kg',
-        condition: 'Good',
-        location: 'Bengaluru',
-        indicativePrice: 4500,
-        availableUntil: new Date(Date.now() + 10 * 86400_000).toISOString(),
-        imageUrl: TINY_PNG, // triggers low-res warning -> NEEDS_REVIEW
-      };
-      const needsRev = await verifyPayload(seller.token, 'material', reviewPayload);
-      assert.equal(needsRev.status, 'NEEDS_REVIEW');
-      assert.equal(needsRev.canPublish, false);
-
-      const reqRev = await apiJson<{ verification: { humanReviewStatus: string } }>(
-        baseUrl,
-        `/api/ai/verifications/${needsRev.id}/request-review`,
-        {
-          method: 'POST',
-          token: seller.token,
-          body: { evidenceNotes: 'Batch GST invoice #INV-2026-441 verified on site.' },
-        }
-      );
-      assert.equal(reqRev.status, 200);
-      assert.equal(reqRev.data.verification.humanReviewStatus, 'pending');
-
-      const adminApprove = await apiJson<{ verification: { humanReviewStatus: string; canPublish: boolean } }>(
-        baseUrl,
-        `/api/admin/ai-verifications/${needsRev.id}`,
-        {
-          method: 'PATCH',
-          token: admin.token,
-          body: { decision: 'approved', notes: 'Invoice evidence confirmed.' },
-        }
-      );
-      assert.equal(adminApprove.status, 200);
-      assert.equal(adminApprove.data.verification.humanReviewStatus, 'approved');
-      assert.equal(adminApprove.data.verification.canPublish, true);
-
-      const pubAfterAdminApprove = await apiJson<{ listing: { id: string } }>(baseUrl, '/api/materials', {
-        method: 'POST',
-        token: seller.token,
-        body: { ...reviewPayload, verificationId: needsRev.id },
-      });
-      assert.equal(pubAfterAdminApprove.status, 201);
 
       // Guide for someone who wants food
       const guideFood = await apiJson<{

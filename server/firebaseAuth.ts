@@ -236,12 +236,6 @@ export function registerFirebaseAuthRoutes(
           .prepare('SELECT * FROM users WHERE LOWER(email) = ? AND is_demo = 0')
           .get(claims.email) as DbUserRow | undefined);
 
-      const DEFAULT_ADMIN_EMAIL = 'thamizh.vishnu211@gmail.com';
-      const configuredAdminEmail = process.env.VERDORA_ADMIN_EMAIL?.trim().toLowerCase();
-      const isConfiguredOperator =
-        claims.email === DEFAULT_ADMIN_EMAIL ||
-        Boolean(configuredAdminEmail && configuredAdminEmail === claims.email);
-
       if (existing) {
         if (existing.account_status === 'Suspended') {
           db.exec('ROLLBACK');
@@ -262,9 +256,6 @@ export function registerFirebaseAuthRoutes(
 
         const nextProvider =
           existing.auth_provider === 'email' ? 'email+google' : existing.auth_provider || 'google';
-        const nextRole = isConfiguredOperator ? 'admin' : existing.role;
-        const nextAccountType = isConfiguredOperator ? 'admin' : existing.account_type;
-        const nextVerification = isConfiguredOperator ? 'Approved' : existing.verification_status;
 
         // Recognize returning user and preserve existing role, business organization, and verification status.
         db.prepare(
@@ -273,9 +264,6 @@ export function registerFirebaseAuthRoutes(
                google_id = COALESCE(google_id, ?),
                avatar_url = CASE WHEN ? != '' THEN ? ELSE avatar_url END,
                auth_provider = ?,
-               role = ?,
-               account_type = ?,
-               verification_status = ?,
                role_selected = 1,
                last_login_at = ?,
                last_activity_at = ?,
@@ -287,27 +275,19 @@ export function registerFirebaseAuthRoutes(
           claims.avatarUrl,
           claims.avatarUrl,
           nextProvider,
-          nextRole,
-          nextAccountType,
-          nextVerification,
           now,
           now,
           now,
           existing.id
         );
 
-        if (isConfiguredOperator && existing.role !== 'admin') {
-          db.prepare(
-            `INSERT OR REPLACE INTO user_roles (user_id, role, account_type, assigned_by, assigned_at)
-             VALUES (?, 'admin', 'admin', 'firebase-google-auth', ?)`
-          ).run(existing.id, now);
-        }
-
         finalUserId = existing.id;
       } else {
         isNewUser = true;
         finalUserId = claims.uid;
 
+        const configuredAdminEmail = process.env.VERDORA_ADMIN_EMAIL?.trim().toLowerCase();
+        const isConfiguredOperator = Boolean(configuredAdminEmail && configuredAdminEmail === claims.email);
         const role = isConfiguredOperator ? 'admin' : 'member';
         const accountType = isConfiguredOperator ? 'admin' : 'general_user';
         const verificationStatus = isConfiguredOperator ? 'Approved' : 'Not Submitted';
@@ -320,7 +300,7 @@ export function registerFirebaseAuthRoutes(
             public_leaderboard, points, is_demo,
             firebase_uid, google_id, avatar_url, auth_provider, last_login_at, role_selected,
             last_activity_at, created_at, updated_at
-          ) VALUES (?, ?, ?, '!google_oauth_no_password!', ?, ?, 'Active', '', '', NULL, ?, 0, 0, 0, ?, ?, ?, 'google', ?, 1, ?, ?, ?)`
+          ) VALUES (?, ?, ?, '!google_oauth_no_password!', ?, ?, 'Active', '', '', NULL, ?, 1, 0, 0, ?, ?, ?, 'google', ?, 1, ?, ?, ?)`
         ).run(
           finalUserId,
           claims.name,

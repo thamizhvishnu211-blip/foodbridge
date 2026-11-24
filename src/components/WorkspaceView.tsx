@@ -96,6 +96,7 @@ export function WorkspaceView({
   const [orgInput, setOrgInput] = useState(user?.organization ?? '');
   const [locInput, setLocInput] = useState(user?.location ?? '');
   const [waInput, setWaInput] = useState(user?.whatsappNumber ?? '');
+  const [publicBoard, setPublicBoard] = useState(user?.publicLeaderboard ?? true);
 
   // Verification form
   const [verOrg, setVerOrg] = useState(user?.organization ?? '');
@@ -139,6 +140,7 @@ export function WorkspaceView({
       setOrgInput(user.organization);
       setLocInput(user.location);
       setWaInput(user.whatsappNumber ?? '');
+      setPublicBoard(user.publicLeaderboard);
       setVerOrg(user.organization);
       void loadWorkspaceData();
     }
@@ -327,6 +329,7 @@ export function WorkspaceView({
         organization: orgInput,
         location: locInput,
         whatsappNumber: waInput || null,
+        publicLeaderboard: publicBoard,
       });
       onUserUpdated(res.user);
       onToast('Profile settings saved.');
@@ -1091,6 +1094,15 @@ export function WorkspaceView({
                 className="mt-1 w-full rounded-lg border border-[#A9B78D]/25 bg-[#0D1612] px-3 py-2 text-sm text-[#F4F7F4] placeholder-[#8FA89B] focus-ring"
               />
             </div>
+            <label className="flex items-center gap-2 text-xs text-[#D2DDD6]">
+              <input
+                type="checkbox"
+                checked={publicBoard}
+                onChange={(e) => setPublicBoard(e.target.checked)}
+                className="accent-[#2B7A58]"
+              />
+              <span>Show my name on the public Green Rewards leaderboard</span>
+            </label>
             <button
               type="submit"
               className="w-full rounded-lg bg-[#2B7A58] px-4 py-2 text-xs font-semibold text-white hover:bg-[#348F68] cursor-pointer"

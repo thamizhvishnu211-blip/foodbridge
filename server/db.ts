@@ -154,24 +154,6 @@ function ensureSchemaMigrations(): void {
   if (!hasColumn('audit_logs', 'result')) {
     db.exec(`ALTER TABLE audit_logs ADD COLUMN result TEXT NOT NULL DEFAULT 'Success';`);
   }
-  if (!hasColumn('material_listings', 'verification_id')) {
-    db.exec(`ALTER TABLE material_listings ADD COLUMN verification_id TEXT;`);
-  }
-  if (!hasColumn('material_listings', 'ai_verification_status')) {
-    db.exec(`ALTER TABLE material_listings ADD COLUMN ai_verification_status TEXT;`);
-  }
-  if (!hasColumn('food_donations', 'verification_id')) {
-    db.exec(`ALTER TABLE food_donations ADD COLUMN verification_id TEXT;`);
-  }
-  if (!hasColumn('food_donations', 'ai_verification_status')) {
-    db.exec(`ALTER TABLE food_donations ADD COLUMN ai_verification_status TEXT;`);
-  }
-  if (!hasColumn('oil_recovery_listings', 'verification_id')) {
-    db.exec(`ALTER TABLE oil_recovery_listings ADD COLUMN verification_id TEXT;`);
-  }
-  if (!hasColumn('oil_recovery_listings', 'ai_verification_status')) {
-    db.exec(`ALTER TABLE oil_recovery_listings ADD COLUMN ai_verification_status TEXT;`);
-  }
 
   // Upgrade impact_ledger CHECK constraint cleanly if legacy table lacks 'oil'
   const ledgerSqlRow = db
@@ -685,30 +667,6 @@ export function initSchemaAndSeed(): void {
       details TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
-
-    CREATE TABLE IF NOT EXISTS listing_verifications (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      listing_type TEXT NOT NULL CHECK(listing_type IN ('material','food','oil')),
-      payload_json TEXT NOT NULL,
-      payload_hash TEXT NOT NULL,
-      image_hash TEXT,
-      status TEXT NOT NULL CHECK(status IN ('VERIFIED','NEEDS_REVIEW','HIGH_RISK')),
-      human_review_status TEXT NOT NULL DEFAULT 'none' CHECK(human_review_status IN ('none','pending','approved','rejected')),
-      human_reviewer_id TEXT,
-      human_review_notes TEXT,
-      risk_score INTEGER NOT NULL DEFAULT 0,
-      summary TEXT NOT NULL,
-      reasons_json TEXT NOT NULL DEFAULT '[]',
-      checks_json TEXT NOT NULL DEFAULT '[]',
-      duplicate_matches_json TEXT NOT NULL DEFAULT '[]',
-      evidence_notes TEXT NOT NULL DEFAULT '',
-      evidence_image_url TEXT,
-      published_listing_id TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      expires_at TEXT NOT NULL
-    );
   `);
 
   ensureSchemaMigrations();
@@ -729,9 +687,6 @@ export function initSchemaAndSeed(): void {
     CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_target_user ON audit_logs(target_user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_customer_notes_user ON customer_admin_notes(user_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_listing_verifications_user ON listing_verifications(user_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_listing_verifications_review ON listing_verifications(human_review_status, status, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_listing_verifications_img ON listing_verifications(image_hash);
   `);
 
   // Ensure platform taxonomy categories exist (categories are system metadata, not fake users)
@@ -761,18 +716,6 @@ export function initSchemaAndSeed(): void {
 
   // Remove any previously seeded demonstration records; never create fake customers on startup
   cleanupConfirmedDemoRecords();
-
-  // Ensure any material listings that already have a completed handover are removed from active marketplace discovery
-  const cleanupNow = new Date().toISOString();
-  db.prepare(
-    `UPDATE material_listings
-     SET status = 'Completed', updated_at = ?
-     WHERE status = 'Active'
-       AND EXISTS (
-         SELECT 1 FROM material_requests mr
-         WHERE mr.listing_id = material_listings.id AND mr.status = 'Completed'
-       )`
-  ).run(cleanupNow);
 
   // Only creates an admin account if VERDORA_ADMIN_EMAIL + VERDORA_ADMIN_PASSWORD are explicitly configured in env
   bootstrapConfiguredAdminIfProvided();

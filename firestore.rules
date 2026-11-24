@@ -85,8 +85,7 @@ service cloud.firestore {
           'id', 'sellerId', 'sellerUid', 'sellerName', 'sellerOrganization', 'sellerVerified',
           'title', 'category', 'description', 'quantity', 'unit', 'condition', 'location',
           'indicativePrice', 'currency', 'imageUrl', 'availableUntil', 'pickupPreferences',
-          'reuseApplications', 'hasWhatsapp', 'verificationId', 'aiVerificationStatus',
-          'completedByRequestId', 'status', 'isHidden', 'isPublic',
+          'reuseApplications', 'hasWhatsapp', 'status', 'isHidden', 'isPublic',
           'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
@@ -111,13 +110,10 @@ service cloud.firestore {
         && data.reuseApplications is list && data.reuseApplications.size() <= 8
         && (data.reuseApplications.size() == 0 || (data.reuseApplications[0] is string && data.reuseApplications[0].size() <= 120))
         && (!('hasWhatsapp' in data) || data.hasWhatsapp is bool)
-        && (!('verificationId' in data) || data.verificationId == null || (data.verificationId is string && data.verificationId.size() <= 128))
-        && (!('aiVerificationStatus' in data) || data.aiVerificationStatus == null || (data.aiVerificationStatus is string && data.aiVerificationStatus.size() <= 64))
-        && (!('completedByRequestId' in data) || isValidId(data.completedByRequestId))
         && data.status is string && data.status in ['Active', 'Paused', 'Unavailable', 'Completed', 'Cancelled']
         && data.isHidden is bool
         && data.isPublic is bool
-        && data.isPublic == (data.isHidden == false && !(data.status in ['Completed', 'Cancelled']))
+        && data.isPublic == (data.isHidden == false && data.status != 'Cancelled')
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -135,8 +131,7 @@ service cloud.firestore {
           'title', 'description', 'category', 'quantity', 'unit', 'portions', 'remainingPortions',
           'preparedAt', 'availableUntil', 'pickupDeadline', 'storageInfo', 'packagingInfo',
           'allergens', 'dietaryInfo', 'location', 'collectionInstructions', 'imageUrl',
-          'hasWhatsapp', 'verificationId', 'aiVerificationStatus', 'completedByRequestId',
-          'status', 'isHidden', 'isPublic', 'createdAt', 'updatedAt'
+          'hasWhatsapp', 'status', 'isHidden', 'isPublic', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
         && data.id == donationId
@@ -163,16 +158,13 @@ service cloud.firestore {
         && data.collectionInstructions is string && data.collectionInstructions.size() <= 400
         && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 750000
         && (!('hasWhatsapp' in data) || data.hasWhatsapp is bool)
-        && (!('verificationId' in data) || data.verificationId == null || (data.verificationId is string && data.verificationId.size() <= 128))
-        && (!('aiVerificationStatus' in data) || data.aiVerificationStatus == null || (data.aiVerificationStatus is string && data.aiVerificationStatus.size() <= 64))
-        && (!('completedByRequestId' in data) || isValidId(data.completedByRequestId))
         && data.status is string && data.status in [
           'Available', 'Request Received', 'Accepted', 'Coordination In Progress',
           'Pickup Scheduled', 'Completed', 'Cancelled', 'Expired'
         ]
         && data.isHidden is bool
         && data.isPublic is bool
-        && data.isPublic == (data.isHidden == false && !(data.status in ['Completed', 'Cancelled', 'Expired']))
+        && data.isPublic == (data.isHidden == false && data.status != 'Cancelled')
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -186,8 +178,7 @@ service cloud.firestore {
         && data.keys().hasOnly([
           'id', 'supplierId', 'supplierUid', 'supplierName', 'supplierOrganization', 'supplierVerified',
           'title', 'oilType', 'volumeLiters', 'qualityGrade', 'containerType', 'filtrationStatus',
-          'pickupWindow', 'location', 'collectionStatus', 'hasWhatsapp', 'verificationId',
-          'aiVerificationStatus', 'completedByEnquiryId', 'isHidden', 'isPublic',
+          'pickupWindow', 'location', 'collectionStatus', 'hasWhatsapp', 'isHidden', 'isPublic',
           'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
@@ -209,12 +200,9 @@ service cloud.firestore {
           'Available', 'Enquiry Pending', 'Scheduled', 'Collected', 'Processed', 'Paused', 'Cancelled'
         ]
         && (!('hasWhatsapp' in data) || data.hasWhatsapp is bool)
-        && (!('verificationId' in data) || data.verificationId == null || (data.verificationId is string && data.verificationId.size() <= 128))
-        && (!('aiVerificationStatus' in data) || data.aiVerificationStatus == null || (data.aiVerificationStatus is string && data.aiVerificationStatus.size() <= 64))
-        && (!('completedByEnquiryId' in data) || isValidId(data.completedByEnquiryId))
         && data.isHidden is bool
         && data.isPublic is bool
-        && data.isPublic == (data.isHidden == false && !(data.collectionStatus in ['Processed', 'Cancelled']))
+        && data.isPublic == (data.isHidden == false && data.collectionStatus != 'Cancelled')
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -410,24 +398,8 @@ service cloud.firestore {
             && incoming().diff(existing()).affectedKeys().hasOnly([
               'title', 'category', 'description', 'quantity', 'unit', 'condition', 'location',
               'indicativePrice', 'imageUrl', 'availableUntil', 'pickupPreferences',
-              'reuseApplications', 'hasWhatsapp', 'completedByRequestId', 'status', 'isPublic',
+              'reuseApplications', 'hasWhatsapp', 'status', 'isPublic',
               'sellerName', 'sellerOrganization', 'updatedAt'
-            ])
-          )
-          || (
-            !(existing().status in ['Completed', 'Cancelled'])
-            && incoming().status == 'Completed'
-            && incoming().isPublic == false
-            && incoming().isHidden == existing().isHidden
-            && incoming().sellerVerified == existing().sellerVerified
-            && ('completedByRequestId' in incoming())
-            && isValidId(incoming().completedByRequestId)
-            && exists(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId))
-            && get(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId)).data.listingId == listingId
-            && get(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId)).data.buyerUid == request.auth.uid
-            && get(/databases/$(database)/documents/material_requests/$(incoming().completedByRequestId)).data.status == 'Completed'
-            && incoming().diff(existing()).affectedKeys().hasOnly([
-              'status', 'isPublic', 'completedByRequestId', 'updatedAt'
             ])
           )
         );
@@ -471,25 +443,8 @@ service cloud.firestore {
               'title', 'description', 'category', 'quantity', 'unit', 'portions',
               'remainingPortions', 'preparedAt', 'availableUntil', 'pickupDeadline',
               'storageInfo', 'packagingInfo', 'allergens', 'dietaryInfo', 'location',
-              'collectionInstructions', 'imageUrl', 'hasWhatsapp', 'completedByRequestId',
-              'status', 'isPublic', 'donorName', 'donorOrganization', 'updatedAt'
-            ])
-          )
-          || (
-            !(existing().status in ['Completed', 'Cancelled', 'Expired'])
-            && incoming().status == 'Completed'
-            && incoming().remainingPortions == 0
-            && incoming().isPublic == false
-            && incoming().isHidden == existing().isHidden
-            && incoming().donorVerified == existing().donorVerified
-            && ('completedByRequestId' in incoming())
-            && isValidId(incoming().completedByRequestId)
-            && exists(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId))
-            && get(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId)).data.donationId == donationId
-            && get(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId)).data.recipientUid == request.auth.uid
-            && get(/databases/$(database)/documents/food_requests/$(incoming().completedByRequestId)).data.status == 'Completed'
-            && incoming().diff(existing()).affectedKeys().hasOnly([
-              'status', 'remainingPortions', 'isPublic', 'completedByRequestId', 'updatedAt'
+              'collectionInstructions', 'imageUrl', 'hasWhatsapp', 'status', 'isPublic',
+              'donorName', 'donorOrganization', 'updatedAt'
             ])
           )
         );
@@ -529,23 +484,7 @@ service cloud.firestore {
             && incoming().isHidden == existing().isHidden
             && incoming().supplierVerified == existing().supplierVerified
             && incoming().diff(existing()).affectedKeys().hasOnly([
-              'collectionStatus', 'isPublic', 'hasWhatsapp', 'completedByEnquiryId', 'updatedAt'
-            ])
-          )
-          || (
-            !(existing().collectionStatus in ['Processed', 'Cancelled'])
-            && incoming().collectionStatus == 'Processed'
-            && incoming().isPublic == false
-            && incoming().isHidden == existing().isHidden
-            && incoming().supplierVerified == existing().supplierVerified
-            && ('completedByEnquiryId' in incoming())
-            && isValidId(incoming().completedByEnquiryId)
-            && exists(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId))
-            && get(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId)).data.listingId == oilId
-            && get(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId)).data.buyerUid == request.auth.uid
-            && get(/databases/$(database)/documents/oil_buyer_enquiries/$(incoming().completedByEnquiryId)).data.status == 'Completed'
-            && incoming().diff(existing()).affectedKeys().hasOnly([
-              'collectionStatus', 'isPublic', 'completedByEnquiryId', 'updatedAt'
+              'collectionStatus', 'isPublic', 'hasWhatsapp', 'updatedAt'
             ])
           )
         );

@@ -1,7 +1,7 @@
-import { Check, Copy } from 'lucide-react';
+import { Award, Check, Copy, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import type { ImpactSummary, PersonalImpactSummary, User } from '../types';
+import type { ImpactSummary, LeaderboardEntry, User } from '../types';
 import { AnimatedCounter } from './AnimatedCounter';
 
 interface ImpactRewardsViewProps {
@@ -11,27 +11,29 @@ interface ImpactRewardsViewProps {
 }
 
 export function ImpactRewardsView({ impact, user, onToast }: ImpactRewardsViewProps) {
-  const [mySummary, setMySummary] = useState<PersonalImpactSummary | null>(null);
+  const [windowFilter, setWindowFilter] = useState<'weekly' | 'monthly' | 'all'>('all');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loadingBoard, setLoadingBoard] = useState(false);
   const [copiedCard, setCopiedCard] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      setMySummary(null);
-      return;
-    }
     let active = true;
+    setLoadingBoard(true);
     api
-      .getMyImpactSummary()
+      .getLeaderboard(windowFilter)
       .then((res) => {
-        if (active) setMySummary(res);
+        if (active) setLeaderboard(res.entries);
       })
       .catch(() => {
-        if (active) setMySummary(null);
+        if (active) setLeaderboard([]);
+      })
+      .finally(() => {
+        if (active) setLoadingBoard(false);
       });
     return () => {
       active = false;
     };
-  }, [user?.id, user?.points]);
+  }, [windowFilter]);
 
   const metrics = impact?.live;
   const categories = impact?.categoryBreakdown ?? [];
@@ -41,10 +43,13 @@ export function ImpactRewardsView({ impact, user, onToast }: ImpactRewardsViewPr
     ...monthly.map((m) => Math.max(m.materialKg, m.foodPortions, m.oilLiters))
   );
 
+  const userLeaderboardEntry = user
+    ? leaderboard.find((e) => e.userId === user.id)
+    : undefined;
+
   const copyShareSummary = async () => {
     if (!user) return;
-    const completedHandovers = mySummary?.completedHandovers ?? 0;
-    const text = `VERDORA Impact Summary — ${user.name} (${user.organization || 'Community Member'}): ${user.points} recognition points, ${completedHandovers} completed handovers. "A Better Life for Every Resource."`;
+    const text = `VERDORA Impact Summary — ${user.name} (${user.organization || 'Community Member'}): ${user.points} recognition points, ${userLeaderboardEntry?.completedHandovers ?? 0} completed handovers. "A Better Life for Every Resource."`;
     try {
       await navigator.clipboard.writeText(text);
       setCopiedCard(true);
@@ -63,7 +68,7 @@ export function ImpactRewardsView({ impact, user, onToast }: ImpactRewardsViewPr
           Real Database Ledger
         </p>
         <h1 className="mt-2 font-display text-3xl font-semibold text-[#F4F7F4] sm:text-4xl">
-          Live Eco Impact & Personal Recognition
+          Live Eco Impact & Community Rewards
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[#C8D6CD]">
           Every figure below is calculated exclusively from completed real handovers recorded in the
@@ -258,18 +263,15 @@ export function ImpactRewardsView({ impact, user, onToast }: ImpactRewardsViewPr
                 {user.name} · {user.organization || 'Community Participant'}
               </h2>
               <p className="mt-1 text-xs text-[#D2DDD6]">
-                <span className="font-mono-tabular font-semibold text-[#93C9A3]">
-                  {mySummary?.points ?? user.points} pts
-                </span>{' '}
-                ·{' '}
+                <span className="font-mono-tabular font-semibold text-[#93C9A3]">{user.points} pts</span> ·{' '}
                 <span className="font-mono-tabular font-semibold text-[#F4F7F4]">
-                  {mySummary?.completedHandovers ?? 0}
+                  {userLeaderboardEntry?.completedHandovers ?? 0}
                 </span>{' '}
                 completed handovers · Verification: {user.verificationStatus}
               </p>
-              {mySummary && mySummary.achievements.length > 0 && (
+              {userLeaderboardEntry && userLeaderboardEntry.achievements.length > 0 && (
                 <div className="mt-3 text-xs text-[#93C9A3]">
-                  Achievements: {mySummary.achievements.join(' · ')}
+                  Achievements: {userLeaderboardEntry.achievements.join(' · ')}
                 </div>
               )}
             </div>
@@ -284,6 +286,90 @@ export function ImpactRewardsView({ impact, user, onToast }: ImpactRewardsViewPr
           </div>
         </section>
       )}
+
+      {/* Green Rewards & Leaderboard */}
+      <section className="rounded-2xl border border-[#A9B78D]/18 bg-[#111C17] p-6 sm:p-8">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#93C9A3]">
+              <Award className="h-4 w-4" />
+              <span>Community Recognition</span>
+            </div>
+            <h2 className="mt-1 font-display text-2xl font-semibold text-[#F4F7F4]">
+              Green Rewards Leaderboard
+            </h2>
+            <p className="mt-1 text-xs text-[#C8D6CD]">
+              Reflects genuine opted-in registered participants and completed handovers only.
+            </p>
+          </div>
+
+          <div className="inline-flex rounded-lg border border-[#A9B78D]/18 bg-[#172620] p-1 self-start">
+            {(['weekly', 'monthly', 'all'] as const).map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setWindowFilter(w)}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize cursor-pointer ${
+                  windowFilter === w
+                    ? 'bg-[#2B7A58] text-white shadow-xs'
+                    : 'text-[#C8D6CD] hover:text-white'
+                }`}
+              >
+                {w === 'all' ? 'All Time' : w}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-x-auto">
+          {loadingBoard ? (
+            <div className="py-8 text-center text-xs text-[#C8D6CD]">Loading leaderboard...</div>
+          ) : leaderboard.length === 0 ? (
+            <div className="rounded-xl border border-[#A9B78D]/15 bg-[#172620] p-8 text-center text-xs text-[#C8D6CD]">
+              No registered customers with public leaderboard participation yet.
+            </div>
+          ) : (
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-[#A9B78D]/18 bg-[#172620] text-xs text-[#C8D6CD]">
+                  <th className="py-3 pl-3 pr-4">Rank</th>
+                  <th className="py-3 px-4">Participant</th>
+                  <th className="py-3 px-4">Achievements</th>
+                  <th className="py-3 px-4 text-right">Handovers</th>
+                  <th className="py-3 pl-4 pr-3 text-right">Points</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#A9B78D]/12">
+                {leaderboard.map((entry, idx) => (
+                  <tr key={entry.userId} className="hover:bg-[#172620]/60">
+                    <td className="py-3.5 pl-3 pr-4 font-mono-tabular text-xs font-semibold text-[#93C9A3]">
+                      #{idx + 1}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-1.5 font-semibold text-[#F4F7F4]">
+                        <span>{entry.displayName}</span>
+                        {entry.verified && <ShieldCheck className="h-3.5 w-3.5 text-[#93C9A3]" />}
+                      </div>
+                      <div className="text-xs text-[#9BB0A3]">{entry.organization}</div>
+                    </td>
+                    <td className="py-3.5 px-4 text-xs text-[#D2DDD6]">
+                      {entry.achievements.length > 0
+                        ? entry.achievements.join(' · ')
+                        : 'Active Member'}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono-tabular text-xs text-[#D2DDD6]">
+                      {entry.completedHandovers}
+                    </td>
+                    <td className="py-3.5 pl-4 pr-3 text-right font-mono-tabular font-semibold text-[#F4F7F4]">
+                      {entry.points}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
